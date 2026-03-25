@@ -1,0 +1,59 @@
+1. Mathematical Foundations
+To handle nested dictionaries and command generation, you aren't just processing text; you are processing Graphs and Trees.
+
+Graph Theory: A nested dictionary is a Directed Acyclic Graph (DAG). You need to understand tree traversal (DFS/BFS) to flatten or "tokenize" these structures without losing the relationship between a parent key and a deeply nested value.
+
+Linear Algebra (Embeddings): You will need to convert keys (strings) into vectors. Understanding how high-dimensional spaces represent semantic similarity will help your model realize that a key like speed and velocity might trigger the same command.
+
+Information Theory (Entropy): For your second model (redundancy), you'll use concepts like Kullback-Leibler (KL) Divergence or Cosine Similarity to measure how much "new" information a key-value pair provides compared to others.
+
+2. Technical Stack & Tools
+Since you want to build from scratch, skip the high-level "AutoML" tools and stick to the building blocks:
+
+Language: Python 3.10+ (Essential for handling complex dictionary manipulations).
+
+Deep Learning Framework: PyTorch. It is more "pythonic" and better for learning the underlying mechanics of tensors and gradients than Keras.
+
+Data Manipulation: NumPy (for matrix math) and Pandas (for initial data structuring).
+
+Environment: Jupyter Notebooks or PyCharm for iterative testing of the recursion logic.
+
+3. Techniques for Model 1: Command Generation
+The challenge here is "Schema Mapping." You need to map a hierarchical structure to a linear string (a command).
+
+Recursive Flattening (Pre-processing)
+Before the AI sees the data, you must represent the "path" of a key.
+
+Input: {'network': {'settings': {'mtu': 1500}}}
+
+Processed: network.settings.mtu = 1500
+You will need to write a Recursive Tokenizer that preserves these paths.
+
+Sequence-to-Sequence (RNN or Transformer)
+You should study the Transformer Architecture. Specifically:
+
+Encoder: Processes the flattened dictionary path.
+
+Decoder: Predicts the next "token" in the command string.
+
+Attention Mechanism: This is the "secret sauce." It allows the model to focus on the specific nested key (e.g., mtu) while ignoring irrelevant keys (e.g., user_name) when generating a specific network command.
+
+4. Techniques for Model 2: Redundancy Identification
+Redundancy in nested data often means two different paths lead to the same functional state, or the data is a subset of another key.
+
+Autoencoders
+Study Anomaly Detection and Autoencoders.
+
+Train a model to "compress" your dictionary into a small vector (Latent Space) and then reconstruct it.
+
+If a key-value pair can be removed and the model can still reconstruct the full state perfectly, that key is mathematically redundant.
+
+Semantic Clustering
+Use SBERT (Sentence-BERT) or Word2Vec logic to find keys that are linguistically identical. If you have auth_type: "pass" and login_method: "password", a clustering algorithm (like K-Means) will group these together, flagging them for review.
+
+5. Suggested Learning Path
+Phase 1: Implement a recursive script that turns any nested dict into a list of "Path-Value" tuples.
+
+Phase 2: Study Recurrent Neural Networks (RNNs) and LSTMs first—they are easier to build "from scratch" than Transformers and handle sequences well.
+
+Phase 3: Build a simple Multi-Layer Perceptron (MLP) in PyTorch that takes a flattened key and predicts a command category.
