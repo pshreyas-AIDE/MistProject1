@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  # 1. PostgreSQL Database
+  db:
+    image: postgres:15
+    container_name: expert_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: my_database
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  # 2. Redis Cache
+  cache:
+    image: redis:alpine
+    container_name: expert_redis
+    restart: always
+    ports:
+      - "6379:6379"
+
+  # 3. MinIO (Local S3 Replacement)
+  s3-local:
+    image: minio/minio
+    container_name: expert_s3
+    restart: always
+    ports:
+      - "9000:9000"  # API Port
+      - "9001:9001"  # Dashboard Port
+    environment:
+      MINIO_ROOT_USER: admin
+      MINIO_ROOT_PASSWORD: password123
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+
+# Define persistent storage areas so data isn't lost when you turn off Docker
+volumes:
+  postgres_data:
+  minio_data:

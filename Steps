@@ -1,0 +1,76 @@
+1. Launch Docker container which is running Postgresql, S3 and Redis Cache
+
+Create file - docker-compose.yml
+
+>> docker compose up -d   -----> To make the container running
+>> docker compose down    ------> To stop the container running
+
+
+2. Commands to check the Post gre sql database
+
+Name on database and other info is defined in docker file -
+
+(.venv) (base) pshreyas@JNPR-MAC-7CQW2M MistProject1 % docker exec -it expert_postgres psql -U user -d my_database
+psql (15.17 (Debian 15.17-1.pgdg13+1))
+Type "help" for help.
+
+my_database=# \dt
+            List of relations
+ Schema |      Name      | Type  | Owner
+--------+----------------+-------+-------
+ public | token_database | table | user
+(1 row)
+
+my_database=# \d token_database
+                   Table "public.token_database"
+    Column     |       Type        | Collation | Nullable | Default
+---------------+-------------------+-----------+----------+---------
+ token_id      | character varying |           | not null |
+ s3_value_path | character varying |           |          |
+Indexes:
+    "token_database_pkey" PRIMARY KEY, btree (token_id)
+
+my_database=# SELECT * FROM token_database;
+ token_id | s3_value_path
+----------+---------------
+(0 rows)
+
+
+
+3.  metadata() - Its like schema/blueprint for a table . 1st it will be empty and then schema is defined by Table function
+
+When you use MetaData, the flow looks like this:
+
+>. metadata = MetaData(): You open a fresh notebook for your database design.
+    Create a blank table with no columns and no rows
+
+>. Table('users', metadata, ...): You write a "page" in that notebook. The table now knows it belongs to that specific metadata object.
+    For the blanck column we are defining shape ( Column , row etc )
+    not metadata is an object for some table eg : m1- Table for Diabetis database , m2- Table for house rent database
+
+>. metadata.create_all(engine): SQLAlchemy flips through every page in the notebook and generates the SQL for every table found inside.
+    Now we use this metadata to create a table defined by it
+
+
+Intuition :
+
+engine - Database
+
+metadata - A project which can have multiple tables which are inter-related
+
+        eg : metadata = MetaData()
+
+        # Table 1: Users
+        users = Table('users', metadata,
+            Column('id', Integer, primary_key=True),
+            Column('name', String)
+        )
+
+        # Table 2: Tokens (Linked to Users)
+        tokens = Table('tokens', metadata,
+            Column('id', Integer, primary_key=True),
+            Column('token_str', String),
+            Column('user_id', ForeignKey('users.id')) # Metadata helps link these!
+        )
+
+

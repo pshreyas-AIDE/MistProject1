@@ -1,10 +1,11 @@
+import json
 '''
 Phase 1: Implement a recursive script that turns any nested dict into a list of "Path-Value" tuples.
 
 
 '''
 
-
+l=[]
 class nested_dict_to_list:
     # payload - Is the nested dictionary structure
     def __init__(self, dictionary):
@@ -21,8 +22,12 @@ class nested_dict_to_list:
                 l.append(key)
                 self.__iter__(payload[key],l)
                 l.pop()
+        elif(isinstance(payload,list)):
+            for element in payload:
+                if(type(element) == dict):
+                    self.__iter__(element, l)
         else:
-            if(isinstance(payload,list) or isinstance(payload,tuple) or isinstance(payload,set)):
+            if(isinstance(payload,tuple) or isinstance(payload,set)):
                 for element in payload:
                     l.append(element)
                     self.list.append(l.copy())
@@ -35,7 +40,7 @@ class nested_dict_to_list:
 
     def print_list_equivalent_of_dict(self):
         for key in self.list:
-            print(key)
+            l.append(key)
 
 
 # Complexity - O( n )  n --- > Number of layers nested
@@ -2977,4 +2982,90 @@ payload={
 }
 obj=nested_dict_to_list(payload)
 obj.print_list_equivalent_of_dict()
+
+
+def grouping(commands):
+
+    # parent_child ->      key ( parent_word, child_word ) Value = Middle    eg :   set vlans vlan_id 10    ----> { (set,vlan_id) : vlans }
+    parent_child={}
+
+    # token_dict  ->      key ( parent_word, child_word ) Value = Unique_token  eg :   set vlans vlan_id 10    ----> { (set,vlan_id) : $RENAME_TOKEN$1 }
+    token_dict={}
+
+    # Took some random string to get tokens
+    token="$RENAME_TOKEN$"
+
+    # token_content ->      key ( token_name ) Value = Middle    eg :   set vlans vlan_id 10    ----> { $RENAME_TOKEN$1 : vlans }
+    token_content={}
+
+    # This is count appended to token to get new unique token for unique (parent,child) combo
+    token_count=0
+
+
+    # Iterate over all commands in list and populate above variables as per description - parent_child, token_dict, token_content
+    for command in commands:
+        command_split=command
+        for ind in range(len(command_split)):
+            if(ind-1<0):
+                parent=None
+            else:
+                parent=command_split[ind-1]
+            if(ind+1>=len(command_split)):
+                child=None
+            else:
+                child=command_split[ind+1]
+
+            if((parent,child) not in parent_child):
+
+                parent_child[(parent,child)]=[command_split[ind]]
+            else:
+                parent_child[(parent,child)].append(command_split[ind])
+            if((parent,child) not in token_dict):
+                token_dict[(parent, child)] = token + str(token_count)
+                token_content[token_dict[(parent, child)]]=[command_split[ind]]
+                token_count += 1
+            else:
+                if(command_split[ind] not in token_content[token_dict[(parent, child)]]):
+                    token_content[token_dict[(parent, child)]].append(command_split[ind])
+
+    # Replace with Token i.e for each command in list , instead of word replace with token
+    # eg : set vlans vlan_id 10    ----> [ $RENAME_TOKEN$1 $RENAME_TOKEN$2 $RENAME_TOKEN$3 $RENAME_TOKEN$4 ]
+    new_command_list=[]
+    for command in commands:
+        command_split=command
+        new_command=[]
+        for ind in range(len(command_split)):
+            if(ind-1<0):
+                parent=None
+            else:
+                parent=command_split[ind-1]
+            if(ind+1>=len(command_split)):
+                child=None
+            else:
+                child=command_split[ind+1]
+            new_command.append(token_dict[(parent,child)])
+        new_command_list.append(new_command)
+
+    # For the same above commands make it set so that no repetitions are present
+    # eg : set vlans vlan_id 10    ----> $RENAME_TOKEN$1 $RENAME_TOKEN$2 $RENAME_TOKEN$3 $RENAME_TOKEN$4
+    token_command_set=set()
+    for i in new_command_list:
+        command=" ".join(i)
+        token_command_set.add(command)
+
+
+    # Generate res dict of below format
+    # eg : $RENAME_TOKEN$1 $RENAME_TOKEN$2 $RENAME_TOKEN$3 $RENAME_TOKEN$4 ---> ,set ,vlans ,vlan_id,vni_id ,10,20,30,40
+    # i.e each token can be mapped to more than 1 words because these words might have same parent and child eg: 10,20,30,40
+    res={}
+    for i in token_command_set:
+        new=""
+        for j in i.split(" "):
+            new+=str(token_content[j])+" "
+        res[i]=new
+    return res
+
+
+grouping(l)
+
 
