@@ -29,7 +29,7 @@ services:
     container_name: expert_s3
     restart: always
     ports:
-      - "9000:9000"  # API Port
+      - "9005:9000"  # API Port
       - "9001:9001"  # Dashboard Port
     environment:
       MINIO_ROOT_USER: admin
