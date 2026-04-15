@@ -12,6 +12,7 @@ from datetime import datetime
 
 
 
+
 '''
 URL = 'https://api.mistsys.com/api/v1/orgs/a85ecd8b-95e9-4ce7-88e0-356b27e2486f/networks'
 ENV = 'staging'
@@ -24,12 +25,12 @@ class HTTP_Calls:
         self.header = {'Content-Type': 'application/json', 'Authorization': 'Token ' + AWS_STAGING_TOKEN}
 
     def get_call(self,url):
-        print(" Starting to Execute the Get Request for URL : ",url)
+        #print(" Starting to Execute the Get Request for URL : ",url)
         return_response=self.session.get(url=url, headers=self.header)
         response = return_response.json()
         status = return_response.status_code
-        print('\tStatus: {}'.format(status))
-        print('\tResponse: {}'.format(response))
+        #print('\tStatus: {}'.format(status))
+        #print('\tResponse: {}'.format(response))
         if(status != 200):
             print('Failed to GET API')
         else:
