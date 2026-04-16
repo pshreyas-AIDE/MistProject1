@@ -31,7 +31,7 @@ class DatabaseManager:
     def __init__(self, db_url):
         # This line creates the engine and 'attaches' it to the class instance.
         # This Just creates connection pool but no TCP connection to Postgre sql are made here - Just resource allocation and specifying the path we need to use for database
-        #  The URL format: postgresql://user:password@hostname:port/database_name
+        # The URL format: postgresql://user:password@hostname:port/database_name
         self.engine =create_engine(
                         db_url,
                         pool_size=10,        # Keep 10 "pipes" open at all times

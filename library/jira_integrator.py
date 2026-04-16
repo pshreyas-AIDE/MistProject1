@@ -62,7 +62,11 @@ class JiraToolkit:
         return self.jira.add_comment(issue_key, comment_text)
 
 
-#jt = JiraToolkit("https://mistsys.atlassian.net/", "pshreyas@juniper.net", "ATATT3xFfGF0vFnJUAPUqbuFzG3Vgago6_vMjZcoU1kpwnGXU44vM3RHpx_iY7gqjDyhqzE3q_NtZz7F1qYBV15Oe8bO3vpHBrjkAfiVomZlCsFF0X-2377UiXLv7SFRZcw90JhtanYefg3TME_MqRGQObqPH_7-_ljDqPMMn0simpB1hBnkcaI=1F442532")
-#res=jt.get_comments("MIST","wired-minis")
+
+
+jt = JiraToolkit("https://mistsys.atlassian.net/", "pshreyas@juniper.net", "ATATT3xFfGF0vFnJUAPUqbuFzG3Vgago6_vMjZcoU1kpwnGXU44vM3RHpx_iY7gqjDyhqzE3q_NtZz7F1qYBV15Oe8bO3vpHBrjkAfiVomZlCsFF0X-2377UiXLv7SFRZcw90JhtanYefg3TME_MqRGQObqPH_7-_ljDqPMMn0simpB1hBnkcaI=1F442532")
+res=jt.search_by_keyword("MIST","cpu")
+for i in res:
+    print(i)
 #res=jt.get_comments("MIST-182565")
 
