@@ -3,11 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <title>Papi Analyzer Dashboard</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        body { background: #f0f2f5; font-family: 'Segoe UI', sans-serif; }
-        .sidebar { width: 280px; height: 100vh; position: fixed; background: #1c1e21; color: white; padding: 25px 20px; }
-        .main-content { margin-left: 280px; padding: 40px; }
+        body { background: #f0f2f5; font-family: 'Segoe UI', sans-serif; transition: all 0.3s ease; }
+        .sidebar { width: 280px; height: 100vh; position: fixed; background: #1c1e21; color: white; padding: 25px 20px; transition: filter 0.3s ease; z-index: 100; display: flex; flex-direction: column; }
+        .main-content { margin-left: 280px; padding: 40px; transition: filter 0.3s ease; }
+
+        /* New Blur Effect Class */
+        .modal-active-blur {
+            filter: blur(5px) grayscale(20%);
+            pointer-events: none;
+            user-select: none;
+        }
+
         .nav-link { color: #b0b3b8; padding: 12px; border-radius: 8px; margin-bottom: 8px; text-decoration: none; display: block; }
         .nav-link.active { background: #0d6efd; color: white; font-weight: bold; }
         .mac-container { max-height: 120px; overflow-y: auto; background: #ffffff; border: 1px solid #ced4da; padding: 12px; border-radius: 8px; font-family: 'Courier New', monospace; font-size: 0.9rem; }
@@ -16,14 +25,68 @@
         .pending { color: #856404; background: #fff3cd; }
         .analyzed { color: #6c757d; background: #e9ecef; }
         #file-display { font-size: 0.8rem; color: #0d6efd; margin-top: 5px; display: block; font-weight: bold; min-height: 1.2rem; }
+
+        .loading-container { display: none; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; padding: 15px; }
+        .progress { height: 8px; border-radius: 4px; }
+        .spinner-grow-sm { width: 0.8rem; height: 0.8rem; }
+
+        .modal.minimized { pointer-events: none; overflow: hidden !important; }
+        .modal.minimized .modal-dialog { position: fixed; bottom: 20px; left: 300px; margin: 0; width: 320px; pointer-events: auto; z-index: 9999; }
+        .modal.minimized .modal-content { box-shadow: 0 8px 30px rgba(0,0,0,0.2); border: 2px solid #0d6efd; border-radius: 12px; }
+        .modal.minimized .modal-body, .modal.minimized .modal-footer { display: none; }
+
+        .btn-minimize { background: transparent; border: none; padding: 0; margin-right: 15px; color: #000; opacity: 0.5; transition: opacity 0.2s, color 0.2s; display: flex; align-items: center; justify-content: center; font-size: 1.25rem; }
+        .btn-minimize:hover { opacity: 0.75; color: #000; }
+
+        .mac-grid-item { transition: transform 0.1s; }
+        .mac-grid-item:hover { transform: scale(1.02); z-index: 1; }
+
+        .search-container { position: relative; width: 350px; }
+        #clearSearchBtn { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); border: none; background: none; color: #adb5bd; cursor: pointer; display: none; z-index: 10; }
+        #clearSearchBtn:hover { color: #dc3545; }
+
+        .btn-group .btn-outline-secondary { border-left: none; background-color: #f8f9fa; color: #6c757d; border-color: #dee2e6; transition: all 0.2s; }
+        .btn-group .btn-outline-secondary:hover { background-color: #e9ecef; color: #dc3545; border-color: #dee2e6; }
+
+        /* Fancy Toast Notification */
+        .custom-alert {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
+            min-width: 300px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            border-left: 5px solid #0d6efd; /* Blue for success */
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+            display: flex;
+            align-items: center;
+            padding: 16px 20px;
+            animation: slideInRight 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+        }
+
+        @keyframes slideInRight {
+            from { transform: translateX(120%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        .alert-exit {
+            animation: slideOutRight 0.5s forwards;
+        }
+
+        @keyframes slideOutRight {
+            from { transform: translateX(0); opacity: 1; }
+            to { transform: translateX(120%); opacity: 0; }
+        }
     </style>
 </head>
 <body>
 
-<div class="sidebar">
+<div id="sidebar-container" class="sidebar">
     <h3 class="mb-4">📁 Papi Analyzer</h3>
     <nav class="nav flex-column mb-5">
-        <a class="nav-link {% if view == 'dashboard' %}active{% endif %}" href="/">📊 EX Grouping Analysis</a>
+        <a class="nav-link {% if view == 'dashboard' %}active{% endif %}" href="/">📊 EX Grouping Analyzer</a>
         <a class="nav-link {% if view == 'search' %}active{% endif %}" href="/search_view">🔍 Pattern Search</a>
     </nav>
     <hr class="border-secondary">
@@ -31,24 +94,79 @@
         <a href="/download" class="btn btn-success w-100 mb-3">📥 Download Text Report</a>
     {% endif %}
     <button onclick="clearAll()" class="btn btn-outline-danger w-100">🗑️ Clear Workspace</button>
+
+    <hr class="border-secondary mt-auto">
+    <div class="px-2">
+        <div class="small text-white mb-2">Logged in as: <strong>{{ session.get('user_name') }}</strong></div>
+        <a href="/logout" class="btn btn-outline-light btn-sm w-100">
+            <i class="bi bi-box-arrow-right"></i> Logout
+        </a>
+    </div>
 </div>
 
-<div class="main-content">
+<div id="main-content-container" class="main-content">
+    <div id="alert-container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="custom-alert border-{{ 'primary' if category == 'success' else 'danger' }}" role="alert">
+            <div class="me-3">
+                {% if category == 'success' %}
+                    <i class="bi bi-check-circle-fill text-primary fs-4"></i>
+                {% else %}
+                    <i class="bi bi-exclamation-triangle-fill text-danger fs-4"></i>
+                {% endif %}
+            </div>
+            <div>
+                <div class="fw-bold text-dark" style="font-size: 0.9rem;">System Notification</div>
+                <div class="text-muted small">{{ message }}</div>
+            </div>
+            <button type="button" class="btn-close ms-auto" onclick="this.parentElement.remove()"></button>
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+</div>
+
     {% if view == 'dashboard' %}
         <div class="d-flex justify-content-between align-items-center mb-4">
-            <h2 class="fw-bold">EX Grouping Analysis</h2>
+            <h2 class="fw-bold">EX Grouping Analyzer</h2>
         </div>
 
         <div class="row">
             <div class="col-md-4">
-                <div class="card p-4 shadow-sm border-0">
+                <div class="card p-4 shadow-sm border-0 mb-4">
                     <form action="/analyze" method="post" enctype="multipart/form-data" id="uploadForm">
                         <label class="form-label fw-bold text-muted small">SELECT JSON FILE ONLY</label>
                         <input type="file" name="file" id="fileInput" class="form-control mb-1" accept=".json" required>
                         <span id="file-display"></span>
-                        <button type="submit" class="btn btn-primary w-100 mt-3">🚀 Analyze Diff</button>
+
+                        <div id="btn-wrapper" class="mt-3">
+                            <button type="submit" id="analyzeBtn" class="btn btn-primary w-100 fw-bold">🚀 Analyze Diff</button>
+                        </div>
+
+                        <div id="loadingState" class="loading-container mt-3">
+                            <div class="d-flex align-items-center justify-content-between mb-2">
+                                <span class="small fw-bold text-primary">
+                                    <span class="spinner-grow spinner-grow-sm me-1" role="status"></span>
+                                    PROCESSING DIFF...
+                                </span>
+                                <span class="badge bg-soft-primary text-primary small">Please wait</span>
+                            </div>
+                            <div class="progress">
+                                <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 100%"></div>
+                            </div>
+                        </div>
                     </form>
                 </div>
+
+                {% if groups %}
+                <div class="card p-4 shadow-sm border-0">
+                    <h6 class="fw-bold text-muted small mb-3">JIRA OPERATIONS</h6>
+                    <button class="btn btn-outline-primary w-100 mb-2" data-bs-toggle="modal" data-bs-target="#createJiraModal">➕ Create Jira</button>
+                    <button class="btn btn-outline-secondary w-100" disabled>🔍 Find Jira</button>
+                </div>
+                {% endif %}
             </div>
 
             <div class="col-md-8">
@@ -65,7 +183,6 @@
                                 <div class="accordion-body bg-light">
                                     <p class="small fw-bold text-muted text-uppercase mb-2">Device MAC List:</p>
                                     <div class="mac-container mb-4">{{ g.macs|join(', ') }}</div>
-
                                     <div class="row">
                                         <div class="col-md-6">
                                             <h6 class="text-primary fw-bold mb-3">ADDED CONFIGS</h6>
@@ -92,17 +209,10 @@
                                             {% endfor %}
                                         </div>
                                     </div>
-
                                     {% if g.added_errors or g.removed_errors %}
                                     <div class="mt-3 pt-3 border-top">
-                                        {% if g.added_errors %}
-                                            <p class="small text-danger fw-bold mb-1">⚠️ ADDED ERRORS:</p>
-                                            <ul class="small fw-bold text-dark">{% for e in g.added_errors %}<li>{{e}}</li>{% endfor %}</ul>
-                                        {% endif %}
-                                        {% if g.removed_errors %}
-                                            <p class="small text-danger fw-bold mb-1">⚠️ REMOVED ERRORS:</p>
-                                            <ul class="small fw-bold text-dark">{% for e in g.removed_errors %}<li>{{e}}</li>{% endfor %}</ul>
-                                        {% endif %}
+                                        {% if g.added_errors %}<p class="small text-danger fw-bold mb-1">⚠️ ADDED ERRORS:</p><ul class="small fw-bold text-dark">{% for e in g.added_errors %}<li>{{e}}</li>{% endfor %}</ul>{% endif %}
+                                        {% if g.removed_errors %}<p class="small text-danger fw-bold mb-1">⚠️ REMOVED ERRORS:</p><ul class="small fw-bold text-dark">{% for e in g.removed_errors %}<li>{{e}}</li>{% endfor %}</ul>{% endif %}
                                     </div>
                                     {% endif %}
                                 </div>
@@ -110,49 +220,230 @@
                         </div>
                         {% endfor %}
                     </div>
-                {% else %}
-                    <div class="card p-5 text-center bg-white border-0 shadow-sm">
-                        <p class="text-muted mb-0">No data found. Upload a JSON file to see analysis results.</p>
-                    </div>
                 {% endif %}
             </div>
         </div>
-    {% else %}
-        <h2 class="fw-bold mb-4">Pattern Search</h2>
+    {% endif %}
+
+    {% if view == 'search' %}
+        <div class="mb-4">
+            <h2 class="fw-bold">Pattern Search</h2>
+            <p class="text-muted">Search for specific command patterns across all devices in the uploaded JSON.</p>
+        </div>
+
         <div class="row">
-            <div class="col-md-5">
-                <div class="card p-4 border-0 shadow-sm">
-                    <form action="/search" method="post">
-                        <label class="small fw-bold mb-2">FIND PATTERN</label>
-                        <input type="text" name="pattern" class="form-control mb-3" value="{{pattern}}" placeholder="Enter command snippet...">
-                        <label class="small fw-bold mb-2">SEARCH IN</label>
-                        <select name="type" class="form-select mb-4">
-                            <option value="removed_config" {% if search_type == 'removed_config' %}selected{% endif %}>Removed Configs</option>
-                            <option value="added_config" {% if search_type == 'added_config' %}selected{% endif %}>Added Configs</option>
-                        </select>
-                        <button class="btn btn-dark w-100">🔍 Filter MACs</button>
+            <div class="col-md-12">
+                <div class="card p-4 shadow-sm border-0 mb-4">
+                    <form action="/search" method="post" id="patternSearchForm" class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small text-muted">SEARCH PATTERN (COMMAND STRING)</label>
+                            <input type="text" name="pattern" id="patternInput" class="form-control" placeholder="e.g. set protocols bgp" value="{{ pattern or '' }}" required>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold small text-muted">CONFIG TYPE</label>
+                            <select name="type" id="typeSelect" class="form-select" required>
+                                <option value="" disabled {% if not search_type %}selected{% endif %}>Select Config Type</option>
+                                <option value="added_config" {% if search_type == 'added_config' %}selected{% endif %}>Added Config</option>
+                                <option value="removed_config" {% if search_type == 'removed_config' %}selected{% endif %}>Removed Config</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3 d-flex align-items-end">
+                            <div class="btn-group w-100 shadow-sm" style="border-radius: 8px; overflow: hidden;">
+                                <button type="submit" class="btn btn-primary w-75 fw-bold">🔍 Search</button>
+                                <button type="button" onclick="resetPatternSearch()" class="btn btn-outline-secondary w-25" title="Reset All Filters"><i class="bi bi-arrow-counterclockwise"></i></button>
+                            </div>
+                        </div>
                     </form>
                 </div>
-            </div>
-            <div class="col-md-7">
-                {% if search_results is defined %}
-                <div class="card p-4 border-0 shadow-sm">
-                    <h5 class="fw-bold mb-3">Affected Devices ({{search_results|length}})</h5>
-                    <div class="mac-container" style="max-height: 450px;">{{search_results|join(', ') if search_results else 'No matches found.'}}</div>
-                </div>
+
+                {% if search_results is not none %}
+                    <div class="card p-4 shadow-sm border-0">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h6 class="fw-bold text-muted m-0">Found in {{ search_results|length }} Devices</h6>
+                            <div class="search-container">
+                                <div class="input-group input-group-sm shadow-sm">
+                                    <span class="input-group-text bg-white border-end-0"><i class="bi bi-filter"></i></span>
+                                    <input type="text" id="macSearchInput" class="form-control border-start-0 pe-5" placeholder="Search within MAC results..." onkeyup="filterMacs()">
+                                    <button id="clearSearchBtn" onclick="resetMacSearch()" title="Clear Search"><i class="bi bi-x-circle-fill"></i></button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mac-container border rounded bg-white p-3" style="max-height: 550px; overflow-y: auto;">
+                            <div id="noResultsAlert" class="text-center py-5" style="display: none;">
+                                <i class="bi bi-search text-danger d-block mb-3" style="font-size: 3rem;"></i>
+                                <h5 class="text-danger fw-bold">No Match Found</h5>
+                                <p class="text-muted small">Try refining your search pattern or check for typos.</p>
+                            </div>
+
+                            {% if search_results %}
+                                <div class="row g-2" id="macGrid">
+                                    {% for mac in search_results %}
+                                        <div class="col-xl-2 col-lg-3 col-md-4 col-sm-6 mac-grid-item">
+                                            <div class="p-2 border rounded text-center font-monospace small bg-light" style="font-size: 0.85rem;">{{ mac }}</div>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                            {% else %}
+                                <div class="text-center my-5">
+                                    {% if not pattern %}
+                                        <i class="bi bi-info-circle text-muted d-block mb-2" style="font-size: 2rem;"></i>
+                                        <h5 class="text-muted fw-bold">Please Enter the pattern and config type.</h5>
+                                    {% else %}
+                                        <i class="bi bi-exclamation-circle text-danger d-block mb-2" style="font-size: 2rem;"></i>
+                                        <h5 class="text-danger fw-bold">No devices matching this pattern found.</h5>
+                                    {% endif %}
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
                 {% endif %}
             </div>
         </div>
     {% endif %}
 </div>
 
+<div class="modal fade" id="createJiraModal" data-bs-backdrop="true" tabindex="-1">
+  <div class="modal-dialog shadow-lg">
+    <div class="modal-content">
+      <form action="/create_jira" method="post" id="jiraForm">
+        <div class="modal-header d-flex align-items-center">
+            <h5 class="modal-title fw-bold">Create Jira Ticket</h5>
+            <div class="ms-auto d-flex align-items-center">
+                <button type="button" class="btn-minimize" onclick="toggleMinimize()"><i class="bi bi-dash-lg" id="toggleIcon"></i></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+        </div>
+        <div class="modal-body">
+            <div class="mb-3"><label class="form-label small fw-bold">Summary</label><input type="text" name="summary" class="form-control" required></div>
+            <div class="mb-3"><label class="form-label small fw-bold">Description</label><textarea name="description" class="form-control" rows="4" required></textarea></div>
+            <div class="mb-3"><label class="form-label small fw-bold">Issue Type</label><select name="issue_type" class="form-select"><option value="Task">Task</option><option value="Bug">Bug</option></select></div>
+            <div class="mb-3"><label class="form-label small fw-bold">Labels</label><input type="text" name="labels" class="form-control" placeholder="e.g. papi, switch"></div>
+        </div>
+        <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button><button type="submit" class="btn btn-primary">Save Ticket</button></div>
+      </form>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
     const fIn = document.getElementById('fileInput'), fDisp = document.getElementById('file-display'), uForm = document.getElementById('uploadForm');
-    function clearAll() { sessionStorage.removeItem('pName'); if (fDisp) fDisp.innerText = ""; window.location.href = "/reset"; }
+
+    // Jira Modal Blur and Reset Logic
+    const jiraModal = document.getElementById('createJiraModal');
+    const mainContent = document.getElementById('main-content-container');
+    const sidebar = document.getElementById('sidebar-container');
+    const jiraForm = document.getElementById('jiraForm');
+    const toggleIcon = document.getElementById('toggleIcon');
+
+    jiraModal.addEventListener('show.bs.modal', function () {
+        if (!jiraModal.classList.contains('minimized')) {
+            mainContent.classList.add('modal-active-blur');
+            sidebar.classList.add('modal-active-blur');
+        }
+    });
+
+    jiraModal.addEventListener('hidden.bs.modal', function () {
+        mainContent.classList.remove('modal-active-blur');
+        sidebar.classList.remove('modal-active-blur');
+
+        // ALWAYS RESET FORM AND STATE ON CLOSE
+        // This ensures if it's closed (even from minimized state), it resets.
+        jiraForm.reset();
+
+        // Remove minimized class so it opens normally next time
+        jiraModal.classList.remove('minimized');
+
+        // Reset the icon and backdrop visibility
+        if(toggleIcon) toggleIcon.className = "bi bi-dash-lg";
+        const backdrop = document.querySelector('.modal-backdrop');
+        if (backdrop) backdrop.style.visibility = 'visible';
+    });
+
+    // Analyze Diff Loading Logic
+    if (uForm) {
+        uForm.addEventListener('submit', function() {
+            if (fIn.files.length > 0) {
+                document.getElementById('btn-wrapper').style.display = 'none';
+                document.getElementById('loadingState').style.display = 'block';
+                sessionStorage.setItem('pName', fIn.files[0].name);
+            }
+        });
+    }
+
+    function clearAll() {
+    sessionStorage.removeItem('pName');
+    if (fDisp) fDisp.innerText = "";
+    window.location.href = "/reset";
+}
+
+    function toggleMinimize() {
+        const modal = document.getElementById('createJiraModal'), icon = document.getElementById('toggleIcon'), backdrop = document.querySelector('.modal-backdrop');
+        modal.classList.toggle('minimized');
+
+        if (modal.classList.contains('minimized')) {
+            icon.className = "bi bi-arrows-angle-expand";
+            if (backdrop) backdrop.style.visibility = 'hidden';
+            mainContent.classList.remove('modal-active-blur');
+            sidebar.classList.remove('modal-active-blur');
+        }
+        else {
+            icon.className = "bi bi-dash-lg";
+            if (backdrop) backdrop.style.visibility = 'visible';
+            mainContent.classList.add('modal-active-blur');
+            sidebar.classList.add('modal-active-blur');
+        }
+    }
+
+    let typingTimer;
+    function filterMacs() { clearTimeout(typingTimer); typingTimer = setTimeout(performFilter, 50); }
+    function resetMacSearch() { const input = document.getElementById('macSearchInput'); if (input) { input.value = ''; performFilter(); } }
+    function resetPatternSearch() { window.location.href = "/search_view"; }
+
+    function performFilter() {
+        const input = document.getElementById('macSearchInput'), filter = input.value.toLowerCase().trim(), grid = document.getElementById('macGrid'), alertBox = document.getElementById('noResultsAlert'), clearBtn = document.getElementById('clearSearchBtn');
+        if (!grid) return;
+        if (clearBtn) clearBtn.style.display = (filter.length > 0) ? 'block' : 'none';
+        const items = Array.from(grid.getElementsByClassName('mac-grid-item'));
+        let visibleCount = 0;
+        for (let item of items) {
+            const isMatch = item.textContent.toLowerCase().includes(filter);
+            item.style.setProperty('display', isMatch ? '' : 'none', 'important');
+            if (isMatch) visibleCount++;
+        }
+        if (alertBox) alertBox.style.display = (visibleCount === 0) ? 'block' : 'none';
+    }
+
     if (performance.navigation.type === performance.navigation.TYPE_RELOAD) { clearAll(); }
-    if (uForm) uForm.onsubmit = () => { if (fIn.files[0]) sessionStorage.setItem('pName', fIn.files[0].name); };
     window.onload = () => { const n = sessionStorage.getItem('pName'); if (n && fDisp) fDisp.innerText = "Current File: " + n; };
+
+    window.onload = () => {
+        // 1. Check if the backend passed the new_login flag
+        const isNewLogin = "{{ new_login }}";
+
+        if (isNewLogin === "true") {
+            // Clear the stored filename from browser memory
+            sessionStorage.removeItem('pName');
+        }
+
+        // 2. Only display the filename if it still exists in storage
+        const n = sessionStorage.getItem('pName');
+        if (n && fDisp) {
+            fDisp.innerText = "Current File: " + n;
+        } else if (fDisp) {
+            fDisp.innerText = ""; // Ensure it's empty if no name exists
+        }
+    };
+    // Auto-dismiss alerts after 1 second
+    // Auto-hide fancy alerts after 4 seconds
+setTimeout(function() {
+    let alerts = document.querySelectorAll('.custom-alert');
+    alerts.forEach(function(alert) {
+        alert.classList.add('alert-exit'); // Trigger exit animation
+        setTimeout(() => alert.remove(), 500); // Remove from DOM after animation
+    });
+}, 4000);
 </script>
 </body>
 </html>
