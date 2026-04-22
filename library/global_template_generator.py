@@ -1,118 +1,70 @@
-from collections import deque
-class SentenceNode:
-    def __init__(self, word):
-        self.word = word
-        self.children = {}  # Dictionary mapping word -> SentenceNode
-import hashlib
+import json
+import hashlib # To get unique Token name which will not be used in payload
 
-f=open("tree.json","w")
+from boto3.dynamodb.types import LIST
 
+from library.s3_library import S3StorageManager
+from library.postgresql import *
+import os
+import math
+
+
+# use Cosine similarity to find top 10% of words which are similar - Import library as below
+# Will be used in one single method
+from sentence_transformers import SentenceTransformer
+from sklearn.metrics.pairwise import cosine_similarity
+import numpy as np
+
+
+f=open("temporary.json","w")
+'''
+Phase 1: Implement a recursive script that turns any nested dict into a list of "Path-Value" tuples.
+
+
+'''
+
+excluded_keys={
+"role":1,
+"notes":1,
+"id":1,
+"name":1,
+"site_id":1,
+"org_id":1,
+"created_time":1,
+"modified_time":1,
+"map_id":1,
+"mac":1,
+"serial":1,
+"model":1,
+"hw_rev":1,
+"tag_uuid":1,
+"tag_id":1,
+"deviceprofile_id":1
+}
+# excluded_keys={}
+# parents_of_keys_which_are_user_input={}
+parents_of_keys_which_are_user_input={"port_usages":1,
+                                      "networks":1,"other_ip_configs":1}
+
+empty_parent_or_empty_child_hash_value="@#$%^&*(Empty Empty Empty)*&^%$#@"
+# PostGre SQL new row addition class
 class TokenDatabase(Base):
     __tablename__ = os.environ.get("env_id")+"_token_mapping_table"
     token_id = Column(String)
     parent_child_value= Column(String,primary_key=True)
     current_node_value=Column(String)
 
+# Postgresql Tokenized sentence to Mac list
+class TokenSentence(Base):
+    __tablename__ = os.environ.get("env_id")+"_token_sentence_mac_table"
+    tokenized_sentence = Column(String,primary_key=True)
+    mac_list=Column(ARRAY(MACADDR),default=[])
 
-class Build_Splice_tree:
-
-    def __init__(self,payload):
-        list_of_sentences = []
-        for i in payload:
-            mac = payload[i]["mac"]
-            l = []
-            obj = nested_dict_to_list()
-            obj.__iter__(payload[i], l)
-            list_of_sentences.extend(obj.list)
-
-        tree_root = self.build_sentence_tree(list_of_sentences)
-        mapping = self.bfs_and_grouping(tree_root)
-    def build_sentence_tree(self,sentences):
-        root = SentenceNode("ROOT")
-        for sentence in sentences:
-            current = root
-            words = sentence
-            for word_original in words:
-                word=str(word_original)
-                if word not in current.children:
-                    current.children[word] = SentenceNode(word)
-                current = current.children[word]
-        return root
-
-
-    def get_structural_hash(self,node):
-        """
-        Creates a fingerprint based ONLY on the identity of children.
-        We use the memory address (id) of the children to ensure
-        we are checking for the EXACT same objects.
-        """
-        # 1. Get sorted keys to ensure deterministic hashing
-        sorted_keys = sorted(node.children.keys())
-
-        # 2. Build a signature: "child_word:memory_address"
-        # id(c) is the pointer. If two parents point to the same id, they share a child.
-        child_signatures = [f"{w}:{id(node.children[w])}" for w in sorted_keys]
-
-        # 3. Join and hash. We exclude node.words from this string!
-        data = "|".join(child_signatures)
-        return hashlib.md5(data.encode()).hexdigest()
-
-
-    def get_sentences_dfs(self,node, current_path, results):
-        """Traverses the tree using DFS to yield sentences."""
-        # If the node is not the root, add its word to the path
-        if node.word != "ROOT":
-            current_path.append(node.word)
-
-        # If it's a leaf node (no children), we've found a full sentence
-        if not node.children:
-            #results.append(" ".join(current_path))
-            results.append(" ".join(str(current_path)))
-        else:
-            # Recurse into children
-            for child_word in node.children:
-                self.get_sentences_dfs(node.children[child_word], current_path, results)
-
-        # Backtrack: remove the word before going up to explore other branches
-        if node.word != "ROOT":
-            current_path.pop()
-
-    def bfs_and_grouping(self,node):
-        parent_child_relation = {}
-        d=deque()
-        d.append([node,0,node,node.children.values()])
-        # node,level,parent node,list of child nodes )
-        levels={}
-        parent_child_mapping={}
-        while len(d)>0:
-
-            current=d.popleft()
-            parent_child_tuple=(current[2].word,current[1]-1,tuple(sorted(current[0].children.keys())),current[1]+1)
-            if(parent_child_tuple not in parent_child_relation):
-                parent_child_relation[parent_child_tuple]=[current[0].word]
-            else:
-                parent_child_relation[parent_child_tuple].append(current[0].word)
-            list_of_children=current[0].children.values()
-            if(current[1] not in levels):
-                levels[current[1]]=[current[0].word]
-            else:
-                levels[current[1]].append(current[0].word)
-            for child in list_of_children:
-                d.append([child,current[1]+1,current[0],child.children.values()])
-
-        # for i in parent_child_relation:
-        #     print(i)
-        #     print(set(parent_child_relation[i]))
-        #     print("##"*10)
-        return parent_child_relation
-
-    def to_hex_key(self,index):
-        """Converts 1 to 'c4ca4238a0b923820dcc509a6f75849b'"""
-        # Using md5 analysis
-        return hashlib.md5(str(index).encode()).hexdigest()
-
-
-
+# Postgresql Token and Token_parent|token_children mapping
+class TokenParentChildReltation(Base):
+    __tablename__ = os.environ.get("env_id")+"_token_parent_child_relation_table"
+    token_id = Column(String,primary_key=True)
+    parent_child_relation= Column(String)
 
 class nested_dict_to_list:
     # payload - Is the nested dictionary structure
@@ -173,15 +125,945 @@ class nested_dict_to_list:
             return self.list
 
     def print_list_equivalent_of_dict(self):
-        l=[]
         for key in self.list:
             l.append(key)
 
+class reverse_list_to_dict:
+    def __init__(self,list):
+        self.list=list
+        self.result={}
+        self.key_dictionary_mapping={} # key - Keys in final payload , value - Datatype of value
+
+    def reverse_function(self):
+        def nest_sentence(sentence):
+            words = sentence
+            nested_dict = {}
+
+            # Iterate through words in reverse
+            for word in reversed(words):
+                # The current word becomes a key, and the previous
+                # nested structure becomes its value
+                nested_dict = {word: nested_dict}
+
+            return nested_dict
+        def traverse_dictionary(sentence):
+            new_sentence=""
+            for content in sentence:
+                # List of list
+                word=str(content)
+                sentence=" ".join(word)
+                if("$|List of Lists|$" in word):
+                    content=word.split("$|List of Lists|$")
+                    new_sentence+=" ["+str(content).replace(" ","")+"]"
+                elif("$|Empty List|$" in word):
+                    new_sentence += " []"
+                elif("%[[[[[[%" in word and "%]]]]]]%" in word):
+                    word=word.replace("%[[[[[[%","")
+                    word=word.replace("%]]]]]]%","")
+                    word.replace(" ","")
+                    new_sentence += " "+word
+                elif("%|List_Of_Dictionary|%" in word):
+                    new_sentence += "["
+                else:
+                    new_sentence += " "+word
+
+            # f.write("\n"+new_sentence+"\n")
+            # f.write("#"*10+"\n")
+            print(new_sentence)
+            return new_sentence
 
 
 
 
 
+
+        for sentence in self.list:
+            # f.write("\n" + str(sentence) + "\n")
+            print(traverse_dictionary(sentence))
+
+class template_generator:
+    def __init__(self,l1,mac):
+        self.l=l1 # List of sentences parsed from nested_dict_to_list
+        self.mac=mac
+        self.create_postgresql_database()
+        self.postgre_sql_tokenized_sentence()
+        self.postgre_sql_token_parent_child_relation()
+        self.create_s3_storage()
+        self.parse_dictionary_final()
+
+    def create_postgresql_database(self):
+        # If already present with the name - Ignore / Not create Just use same
+        # Else create
+
+        # Fixed format
+        database_table_name=os.environ.get("env_id")+"_token_mapping_table"
+        user_name=os.environ.get("postgresql_username")
+        password=os.environ.get("postgresql_password")
+        host=os.environ.get("postgresql_host")
+        port=os.environ.get("postgresql_port")
+        database_schema=os.environ.get("postgresql_schema")
+
+        database_url=f"postgresql://{user_name}:{password}@{host}:{port}/{database_schema}"
+
+        self.postgresql_obj=DatabaseManager(database_url)
+
+        # This is standard format of table
+        cols={"token_id": String,"parent_child_value": String,"current_node_value": String}
+        self.postgresql_obj.create_custom_table(database_table_name,cols,primary_key_defined="parent_child_value")
+        self.postgresql_obj.session_local()
+
+        # Object is ready to be used to read or write etc
+
+    def postgre_sql_tokenized_sentence(self):
+        # If already present with the name - Ignore / Not create Just use same
+        # Else create
+
+        # Fixed format
+        database_table_name=os.environ.get("env_id")+"_token_sentence_mac_table"
+        user_name=os.environ.get("postgresql_username")
+        password=os.environ.get("postgresql_password")
+        host=os.environ.get("postgresql_host")
+        port=os.environ.get("postgresql_port")
+        database_schema=os.environ.get("postgresql_schema")
+
+        database_url=f"postgresql://{user_name}:{password}@{host}:{port}/{database_schema}"
+
+        self.postgresql_tokenized_obj=DatabaseManager(database_url)
+
+
+
+        # This is standard format of table
+        cols={"tokenized_sentence": String,"mac_list": ARRAY(MACADDR)}
+        self.postgresql_tokenized_obj.create_custom_table(database_table_name,cols,primary_key_defined="tokenized_sentence")
+        self.postgresql_tokenized_obj.session_local()
+
+        # Object is ready to be used to read or write etc
+
+    def postgre_sql_token_parent_child_relation(self):
+        # If already present with the name - Ignore / Not create Just use same
+        # Else create
+
+        # Fixed format
+        database_table_name=os.environ.get("env_id")+"_token_parent_child_relation_table"
+        user_name=os.environ.get("postgresql_username")
+        password=os.environ.get("postgresql_password")
+        host=os.environ.get("postgresql_host")
+        port=os.environ.get("postgresql_port")
+        database_schema=os.environ.get("postgresql_schema")
+
+        database_url=f"postgresql://{user_name}:{password}@{host}:{port}/{database_schema}"
+
+        self.postgresql_token_parent_child_relation=DatabaseManager(database_url)
+
+
+
+        # This is standard format of table
+        cols={"token_id": String,"parent_child_relation": String}
+        self.postgresql_token_parent_child_relation.create_custom_table(database_table_name,cols,primary_key_defined="token_id")
+        self.postgresql_token_parent_child_relation.session_local()
+
+        # Object is ready to be used to read or write etc
+
+
+    def create_s3_storage(self):
+
+        schema_name=os.environ.get("s3_schema_name")
+        self.s3_object = S3StorageManager(schema_name)
+
+    def to_hex_key(self,index):
+        """Converts 1 to 'c4ca4238a0b923820dcc509a6f75849b'"""
+        # Using md5 analysis
+        return hashlib.md5(str(index).encode()).hexdigest()
+
+    def parse_dictionary(self):
+
+        # This will iterate over sentence and if a word already has token then replace it with the single word in token ---
+        '''
+        generate_new_sentence
+
+    1, This will take a sentence and for each word calculate its parent and child value
+    2. checks if token id of word is in database
+    3. If not present , add a data row in database (token_id, parent_child , single_word_value).
+                            single_word_value - Will represent all the words belonging to token id
+                                                In this way customer configs can have 1000's of port profile name , but we map all 1000s of name to one single name
+        Else ,
+                        Row already present , we just need to replace current wor with the word in row
+
+        eg:
+
+        port_usages customer1profile interface mode access
+        port_usages customer2profile interface mode access
+        port_usages customer3profile interface mode access
+        port_usages customer4profile interface mode access
+        port_usages customer5profile interface mode access
+
+        Row - (######token######,port_usage|interface,customer1profile)
+
+
+        The above 5 rows will be quivalent to 1 row - port_usages customer1profile interface mode access
+
+        port_usages customer1profile interface mode access. ----after_function--- port_usages customer1profile interface mode access
+        port_usages customer2profile interface mode access  ----after_function--- port_usages customer1profile interface mode access
+        port_usages customer3profile interface mode access  ----after_function--- port_usages customer1profile interface mode access
+        port_usages customer4profile interface mode access  ----after_function--- port_usages customer1profile interface mode access
+        port_usages customer5profile interface mode access  ----after_function--- port_usages customer1profile interface mode access
+        :return:
+        '''
+        token_s3_mapping={}
+        token_wise_sentence = {}
+        def generate_new_sentence(item):
+
+            # Step 1 : Get the token mapping based on word parent and child mapping
+            word_parent_child=[]
+            for i in range(len(item)):
+                current_element =item[i]
+                if(i-1<0):
+                    parent=empty_parent_or_empty_child_hash_value
+                else:
+                    parent=item[i-1]
+                if(i+1>=len(item)):
+                    child=empty_parent_or_empty_child_hash_value
+                else:
+                    child=item[i+1]
+                parent_child_representation = f"{parent}|{child}"
+                token_id = self.to_hex_key(parent_child_representation)
+                row_present_or_not = self.postgresql_obj.find_row_by_column("parent_child_value",
+                                                                            parent_child_representation)
+                if(row_present_or_not):
+                    pass
+
+
+
+
+
+
+
+
+
+
+
+            # Iterate over all words and replace the words with tokens if already present
+            new_item=[]
+            sentence=[]
+            for i in range(len(item)):
+                current_element =item[i]
+                if(i-1<0):
+                    parent=empty_parent_or_empty_child_hash_value
+                else:
+                    parent=item[i-1]
+                if(i+1>=len(item)):
+                    child=empty_parent_or_empty_child_hash_value
+                else:
+                    child=item[i+1]
+                parent_child_representation = f"{parent}|{child}"
+                token_id = self.to_hex_key(parent_child_representation)
+
+                if (token_id not in token_s3_mapping):
+                    token_s3_mapping[token_id] = [current_element]
+                else:
+                    if (current_element not in token_s3_mapping[token_id]):
+                        token_s3_mapping[token_id].append(current_element)
+
+                row_present_or_not=self.postgresql_obj.find_row_by_column("parent_child_value",parent_child_representation)
+                # If row not present , add it
+                if(row_present_or_not==None):
+                    row_obj = TokenDatabase(
+                        token_id=token_id,
+                        parent_child_value=parent_child_representation,
+                        current_node_value=current_element
+                    )
+                    self.postgresql_obj.add_row(row_obj)
+                    new_item.append(current_element)
+                    sentence.append(str(token_id))
+                else:
+                    new_item.append(row_present_or_not[2])
+                    sentence.append(str(row_present_or_not[0]))
+            sentence.sort()
+            if(tuple(sentence) not in token_wise_sentence):
+                token_wise_sentence[tuple(sentence)] = [self.mac]
+            else:
+                token_wise_sentence[tuple(sentence)].append(self.mac)
+                # Make token sentence
+            return new_item
+
+        for ind in range(len(self.l)):
+            original_item=self.l[ind]
+            item = generate_new_sentence(original_item)
+            self.l[ind]=item.copy()
+        # Add S3 data in bulk
+        # s3 update
+        for key in token_s3_mapping:
+
+            token_id=key
+            value=token_s3_mapping[key]
+            token_word_mapping_s3 = os.environ.get("env_id") + "/token_mapping_s3/" + token_id + ".jsonl"
+            data_present_in_s3 = self.s3_object.get_data(token_word_mapping_s3)
+            # If None is returned it means it is empty else we need to append
+            if (data_present_in_s3):
+                for word in value:
+                    if(word not in data_present_in_s3):
+                        data_present_in_s3.append(word)
+            else:
+                data_present_in_s3 = value
+            self.s3_object.upload_data(token_word_mapping_s3, json.dumps(data_present_in_s3))
+
+        # token_wise_sentence={}
+        # for item in self.l:
+        #     sentence=[]
+        #     for word in item:
+        #         print(word)
+        #         if(word==None):
+        #             row = self.postgresql_obj.find_row_by_column("current_node_value", word)
+        #         else:
+        #             row=self.postgresql_obj.find_row_by_column("current_node_value",str(word))
+        #         print(row)
+        #         sentence.append(str(row[0]))
+        #     # if(tuple(sentence) not in token_wise_sentence):
+        #     #     token_wise_sentence[tuple(sentence)]=[self.mac]
+        #     # else:
+        #     #     token_wise_sentence[tuple(sentence)].append(self.mac)
+
+        # Add the token_wise_sentence to s3 and satabase
+        # s3 update
+        for key in token_wise_sentence:
+            new_sentence=key # This is a tuple
+            mac_list=token_wise_sentence[key] # This is list
+            f.write("\n" + str(new_sentence)+"\n")
+            s=""
+            for i in new_sentence:
+                s+=str(token_s3_mapping[i])+" "
+            f.write("\n" + s + "\n")
+            f.write("##"*10)
+
+            # S3 -- Key_name = token_sentence_mac_mapping     File_content=Mac_list
+            token_sentence_mac_mapping = os.environ.get("env_id") + "/token_sentence_to_mac/" + "|".join(new_sentence) + ".jsonl"
+            data_present_in_s3 = self.s3_object.get_data(token_sentence_mac_mapping)
+            # If None is returned it means it is empty else we need to append
+            if (data_present_in_s3):
+                for mac in mac_list:
+                    if(mac not in data_present_in_s3):
+                        data_present_in_s3.append(mac)
+            else:
+                data_present_in_s3 = mac_list
+            self.s3_object.upload_data(token_sentence_mac_mapping, json.dumps(data_present_in_s3))
+
+            # Postgresql key
+
+            existing_row=self.postgresql_tokenized_obj.find_row_by_column("tokenized_sentence","|".join(new_sentence))
+            if(existing_row):
+                for mac in mac_list:
+                    mac_with_colon=":".join(mac[i:i+2] for i in range(0, len(mac), 2))
+                    if(mac_with_colon not in existing_row[1]):
+                        existing_row[1].append(mac_with_colon)
+                update={"mac_list":existing_row[1]}
+                self.postgresql_tokenized_obj.upsert_tokenized_data("|".join(new_sentence),existing_row[1])
+            else:
+                existing_row=[]
+                for mac in mac_list:
+                    mac_with_colon = ":".join(mac[i:i + 2] for i in range(0, len(mac), 2))
+                    if(mac_with_colon not in existing_row):
+                        existing_row.append(mac_with_colon)
+                row_obj=TokenSentence(
+                    tokenized_sentence="|".join(new_sentence),
+                    mac_list=existing_row
+                )
+                self.postgresql_tokenized_obj.add_row(row_obj)
+
+    def parse_dictionary_new(self):
+
+        # This will iterate over sentence and if a word already has token then replace it with the single word in token ---
+        '''
+        generate_new_sentence
+
+    1, This will take a sentence and for each word calculate its parent and child value
+    2. checks if token id of word is in database
+    3. If not present , add a data row in database (token_id, parent_child , single_word_value).
+                            single_word_value - Will represent all the words belonging to token id
+                                                In this way customer configs can have 1000's of port profile name , but we map all 1000s of name to one single name
+        Else ,
+                        Row already present , we just need to replace current wor with the word in row
+
+        eg:
+
+        port_usages customer1profile interface mode access
+        port_usages customer2profile interface mode access
+        port_usages customer3profile interface mode access
+        port_usages customer4profile interface mode access
+        port_usages customer5profile interface mode access
+
+        Row - (######token######,port_usage|interface,customer1profile)
+
+
+        The above 5 rows will be quivalent to 1 row - port_usages customer1profile interface mode access
+
+        port_usages customer1profile interface mode access. ----after_function--- port_usages customer1profile interface mode access
+        port_usages customer2profile interface mode access  ----after_function--- port_usages customer1profile interface mode access
+        port_usages customer3profile interface mode access  ----after_function--- port_usages customer1profile interface mode access
+        port_usages customer4profile interface mode access  ----after_function--- port_usages customer1profile interface mode access
+        port_usages customer5profile interface mode access  ----after_function--- port_usages customer1profile interface mode access
+        :return:
+        '''
+        token_s3_mapping={}
+        token_wise_sentence = {}
+        def generate_new_sentence(item):
+
+            # Step 1 : Get the token mapping based on word parent and child mapping
+            word_parent_child=[]
+            for i in range(len(item)):
+                current_element =item[i]
+                if(i-1<0):
+                    parent=empty_parent_or_empty_child_hash_value
+                else:
+                    parent=item[i-1]
+                if(i+1>=len(item)):
+                    child=empty_parent_or_empty_child_hash_value
+                else:
+                    child=item[i+1]
+                parent_child_representation = f"{parent}|{child}"
+                token_id = self.to_hex_key(parent_child_representation)
+
+
+                row_present_or_not = self.postgresql_obj.find_row_by_column("parent_child_value",
+                                                                            parent_child_representation)
+                if(row_present_or_not==None):
+                    word_parent_child.append(None)
+                else:
+                    word_parent_child.append(row_present_or_not[0])
+
+            # Token wise parent child relation
+            token_parent_child_relation=[None for i in range(len(word_parent_child))]
+            for ind in range(len(word_parent_child)):
+                if(word_parent_child[ind]!=None):
+                    token_parent_child_relation[ind]=word_parent_child[ind]
+                    continue
+                current_token=None
+                if(ind-1<0):
+                    if(word_parent_child[ind+1]!=None):
+                        row_exist=self.postgresql_token_parent_child_relation.find_row_by_column("parent_child_relation",
+                                                                                       empty_parent_or_empty_child_hash_value + "|" +
+                                                                                       word_parent_child[ind + 1])
+                        if(row_exist):
+                            current_token=row_exist[0]
+                elif(ind+1>=len(word_parent_child)):
+                    if(word_parent_child[ind-1]!=None):
+                        row_exist = self.postgresql_token_parent_child_relation.find_row_by_column(
+                            "parent_child_relation",word_parent_child[ind - 1]+"|"+empty_parent_or_empty_child_hash_value)
+                        if (row_exist):
+                            current_token = row_exist[0]
+                else:
+                    if(word_parent_child[ind-1]!=None and word_parent_child[ind+1]!=None):
+                        row_exist=self.postgresql_token_parent_child_relation.find_row_by_column("parent_child_relation",word_parent_child[ind-1]+"|"+word_parent_child[ind+1])
+                        if (row_exist):
+                            current_token = row_exist[0]
+                    else:
+                        current_token=None
+
+                token_parent_child_relation.append(current_token)
+
+            finalized_token_list=[]
+            for i in range(len(item)):
+                if(token_parent_child_relation[i]!=None):
+                    finalized_token_list.append(token_parent_child_relation[i])
+                    continue
+                current_element =item[i]
+                if(i-1<0):
+                    parent=empty_parent_or_empty_child_hash_value
+                else:
+                    parent=item[i-1]
+                if(i+1>=len(item)):
+                    child=empty_parent_or_empty_child_hash_value
+                else:
+                    child=item[i+1]
+                parent_child_representation = f"{parent}|{child}"
+                token_id = self.to_hex_key(parent_child_representation)
+                row_present_or_not = self.postgresql_obj.find_row_by_column("parent_child_value",
+                                                                            parent_child_representation)
+
+                if(row_present_or_not==None):
+                    row_obj = TokenDatabase(
+                        token_id=token_id,
+                        parent_child_value=parent_child_representation,
+                        current_node_value=current_element
+                    )
+                    self.postgresql_obj.add_row(row_obj)
+                    finalized_token_list.append(token_id)
+                else:
+                    finalized_token_list.append(row_present_or_not[0])
+
+            # Add token table
+            for i in range(len(finalized_token_list)):
+                token_id=finalized_token_list[i]
+                curent_word=item[i]
+                if (token_id not in token_s3_mapping):
+                    token_s3_mapping[token_id] = [curent_word]
+                else:
+                    if (curent_word not in token_s3_mapping[token_id]):
+                        token_s3_mapping[token_id].append(curent_word)
+
+
+                token_id_present_or_not=self.postgresql_token_parent_child_relation.find_row_by_column("token_id",token_id)
+                if(token_id_present_or_not!=None):
+                    continue
+                if(i-1<0):
+                    parent=empty_parent_or_empty_child_hash_value
+                    child=finalized_token_list[i+1]
+                elif(i+1>=len(finalized_token_list)):
+                    child=empty_parent_or_empty_child_hash_value
+                    parent=finalized_token_list[i-1]
+                else:
+                    parent = finalized_token_list[i - 1]
+                    child = finalized_token_list[i + 1]
+
+                row_present_or_not=self.postgresql_token_parent_child_relation.find_row_by_column("parent_child_relation",str(parent)+"|"+str(child))
+
+                if (row_present_or_not == None):
+
+                    row_obj = TokenParentChildReltation(
+                        token_id=token_id,
+                        parent_child_relation=str(parent)+"|"+str(child)
+                    )
+                    self.postgresql_token_parent_child_relation.add_row(row_obj)
+
+
+
+            if(tuple(finalized_token_list) not in token_wise_sentence):
+                token_wise_sentence[tuple(finalized_token_list)]=[self.mac]
+            else:
+                token_wise_sentence[tuple(finalized_token_list)].append(self.mac)
+
+
+
+        for ind in range(len(self.l)):
+            original_item=self.l[ind]
+            generate_new_sentence(original_item)
+
+        # Add S3 data in bulk
+        # s3 update
+        for key in token_s3_mapping:
+
+            token_id=key
+            value=token_s3_mapping[key]
+            token_word_mapping_s3 = os.environ.get("env_id") + "/token_mapping_s3/" + token_id + ".jsonl"
+            data_present_in_s3 = self.s3_object.get_data(token_word_mapping_s3)
+            # If None is returned it means it is empty else we need to append
+            if (data_present_in_s3):
+                for word in value:
+                    if(word not in data_present_in_s3):
+                        data_present_in_s3.append(word)
+            else:
+                data_present_in_s3 = value
+            self.s3_object.upload_data(token_word_mapping_s3, json.dumps(data_present_in_s3))
+
+        # token_wise_sentence={}
+        # for item in self.l:
+        #     sentence=[]
+        #     for word in item:
+        #         print(word)
+        #         if(word==None):
+        #             row = self.postgresql_obj.find_row_by_column("current_node_value", word)
+        #         else:
+        #             row=self.postgresql_obj.find_row_by_column("current_node_value",str(word))
+        #         print(row)
+        #         sentence.append(str(row[0]))
+        #     # if(tuple(sentence) not in token_wise_sentence):
+        #     #     token_wise_sentence[tuple(sentence)]=[self.mac]
+        #     # else:
+        #     #     token_wise_sentence[tuple(sentence)].append(self.mac)
+
+        # Add the token_wise_sentence to s3 and satabase
+        # s3 update
+        for key in token_wise_sentence:
+            new_sentence=key # This is a tuple
+            mac_list=token_wise_sentence[key] # This is list
+
+            # S3 -- Key_name = token_sentence_mac_mapping     File_content=Mac_list
+            token_sentence_mac_mapping = os.environ.get("env_id") + "/token_sentence_to_mac/" + "|".join(new_sentence) + ".jsonl"
+            data_present_in_s3 = self.s3_object.get_data(token_sentence_mac_mapping)
+            # If None is returned it means it is empty else we need to append
+            if (data_present_in_s3):
+                for mac in mac_list:
+                    if(mac not in data_present_in_s3):
+                        data_present_in_s3+=mac
+            else:
+                data_present_in_s3 = mac_list
+            self.s3_object.upload_data(token_sentence_mac_mapping, json.dumps(data_present_in_s3))
+
+            # Postgresql key
+
+            existing_row=self.postgresql_tokenized_obj.find_row_by_column("tokenized_sentence","|".join(new_sentence))
+            if(existing_row):
+                for mac in mac_list:
+                    mac_with_colon=":".join(mac[i:i+2] for i in range(0, len(mac), 2))
+                    if(mac_with_colon not in existing_row[1]):
+                        existing_row[1].append(mac_with_colon)
+                print("####",existing_row[1])
+                update={"mac_list":existing_row[1]}
+                self.postgresql_tokenized_obj.upsert_tokenized_data("|".join(new_sentence),existing_row[1])
+            else:
+                existing_row=[]
+                for mac in mac_list:
+                    mac_with_colon = ":".join(mac[i:i + 2] for i in range(0, len(mac), 2))
+                    if(mac_with_colon not in existing_row):
+                        existing_row.append(mac_with_colon)
+                print("####", existing_row)
+                row_obj=TokenSentence(
+                    tokenized_sentence="|".join(new_sentence),
+                    mac_list=existing_row
+                )
+                self.postgresql_tokenized_obj.add_row(row_obj)
+
+    def parse_dictionary_final(self):
+        '''
+        Steps :
+        1. Iterate over all the sentences
+        2. unique_sentence={}
+        3. For each sentence :
+                token_sentence=[]
+                a.
+                    Create List already_existing_token
+                    Iterate over words
+                    Get (parent,child) and check if it is available in database , if yes add [True,(parent,child),token_id] in list
+                                                                                  else just add [False,original_word,None] in list
+                b.
+                    Iterate over already_existing_token
+                    If item[0] is false --- Create a token with (item[i-1][1],item[i+1][1]) if it does not exist else dont create just get token_id. Add token_id to token_sentence
+                    Else --- Dont create token. Add token_id to token_sentence
+
+                add tuple(token_sentence) to unique_sentence
+
+
+        :return:
+        '''
+        unique_sentence={}
+        token_word_s3_mapping={}
+
+        def each_sentence_parsing(sentence):
+            token_sentence=[]
+            already_existing_token=[]
+
+            for ind in range(len(sentence)):
+                parent=None
+                child=None
+                myself=sentence[ind]
+                if(ind-1<0):
+                    parent=empty_parent_or_empty_child_hash_value
+                    child=sentence[ind+1]
+                elif(ind+1>=len(sentence)):
+                    child=empty_parent_or_empty_child_hash_value
+                    parent=sentence[ind-1]
+                else:
+                    child = sentence[ind + 1]
+                    parent = sentence[ind - 1]
+
+                parent_child_representation = f"{parent}|{child}"
+
+
+
+                token_already_present=self.postgresql_obj.find_row_by_column("parent_child_value",parent_child_representation)
+                if(token_already_present):
+                    already_existing_token.append([True,token_already_present[1],token_already_present[0]])
+                else:
+                    already_existing_token.append([False, sentence[ind], None])
+
+            for ind in range(len(already_existing_token)):
+                if(already_existing_token[ind][0]==True):
+                    token_sentence.append(already_existing_token[ind][2])
+                    if(already_existing_token[ind][2] not in token_word_s3_mapping):
+                        token_word_s3_mapping[already_existing_token[ind][2]]=[sentence[ind]]
+                    else:
+                        token_word_s3_mapping[already_existing_token[ind][2]].append(sentence[ind])
+                    continue
+
+                if(ind-1<0):
+                    parent=empty_parent_or_empty_child_hash_value
+                    child=already_existing_token[ind+1][1]
+                elif(ind+1>=len(already_existing_token)):
+                    child=empty_parent_or_empty_child_hash_value
+                    parent=already_existing_token[ind-1][1]
+                else:
+                    child = already_existing_token[ind+1][1]
+                    parent = already_existing_token[ind-1][1]
+
+                parent_child_representation = f"{parent}|{child}"
+                token_id=self.to_hex_key(parent_child_representation)
+
+                if(already_existing_token[ind][1]=="networks"):
+                    print(parent_child_representation)
+
+                token_exist=self.postgresql_obj.find_row_by_column("parent_child_value",parent_child_representation)
+                if(token_exist):
+                    token_sentence.append(token_exist[0])
+                    # Add current word to s3 file
+                    if(token_exist[0] not in token_word_s3_mapping):
+                        token_word_s3_mapping[token_exist[0]]=[sentence[ind]]
+                    else:
+                        token_word_s3_mapping[token_exist[0]].append(sentence[ind])
+                else:
+
+                    row=TokenDatabase(
+                        token_id=token_id,
+                        parent_child_value=parent_child_representation,
+                        current_node_value=sentence[ind]
+                        )
+                    self.postgresql_obj.add_row(row)
+                    token_sentence.append(token_id)
+                    if(token_id not in token_word_s3_mapping):
+                        token_word_s3_mapping[token_id]=[sentence[ind]]
+                    else:
+                        token_word_s3_mapping[token_id].append(sentence[ind])
+                f.write("\n" + "$$" * 10 + "\n")
+                f.write(str(token_exist)+" "+parent_child_representation+"\n")
+                f.write("\n\n")
+            if(tuple(token_sentence) not in unique_sentence):
+                unique_sentence[tuple(token_sentence)]=[self.mac]
+            else:
+                unique_sentence[tuple(token_sentence)].append(self.mac)
+
+            f.write("\n" + str("|".join(token_sentence)) + "\n")
+            f.write("\n" + str(sentence) + "\n")
+            f.write("\n" + "$$" * 10 + "\n")
+
+        for sentence in self.l:
+            if(sentence[0] in excluded_keys):
+                continue
+            each_sentence_parsing(sentence)
+
+        # Write to s3 - Token to all words mapping
+        for key in token_word_s3_mapping:
+
+            token_id=key
+            value=token_word_s3_mapping[key]
+            token_word_mapping_s3 = os.environ.get("env_id") + "/token_mapping_s3/" + token_id + ".jsonl"
+            data_present_in_s3 = self.s3_object.get_data(token_word_mapping_s3)
+            # If None is returned it means it is empty else we need to append
+            if (data_present_in_s3):
+                for word in value:
+                    if(word not in data_present_in_s3):
+                        data_present_in_s3.append(word)
+            else:
+                data_present_in_s3 = value
+            self.s3_object.upload_data(token_word_mapping_s3, json.dumps(data_present_in_s3))
+
+
+
+        for key in unique_sentence:
+            new_sentence=key # This is a tuple
+            mac_list=unique_sentence[key] # This is list
+            # S3 -- Key_name = token_sentence_mac_mapping     File_content=Mac_list
+            token_sentence_mac_mapping = os.environ.get("env_id") + "/token_sentence_to_mac/" + "|".join(new_sentence) + ".jsonl"
+            data_present_in_s3 = self.s3_object.get_data(token_sentence_mac_mapping)
+            # If None is returned it means it is empty else we need to append
+            if (data_present_in_s3):
+                for mac in mac_list:
+                    if(mac not in data_present_in_s3):
+                        data_present_in_s3.append(mac)
+            else:
+                data_present_in_s3 = mac_list
+            self.s3_object.upload_data(token_sentence_mac_mapping, json.dumps(data_present_in_s3))
+
+            # Postgresql key
+
+            existing_row=self.postgresql_tokenized_obj.find_row_by_column("tokenized_sentence","|".join(new_sentence))
+            if(existing_row):
+                for mac in mac_list:
+                    mac_with_colon=":".join(mac[i:i+2] for i in range(0, len(mac), 2))
+                    if(mac_with_colon not in existing_row[1]):
+                        existing_row[1].append(mac_with_colon)
+                update={"mac_list":existing_row[1]}
+                self.postgresql_tokenized_obj.upsert_tokenized_data("|".join(new_sentence),existing_row[1])
+            else:
+                existing_row=[]
+                for mac in mac_list:
+                    mac_with_colon = ":".join(mac[i:i + 2] for i in range(0, len(mac), 2))
+                    if(mac_with_colon not in existing_row):
+                        existing_row.append(mac_with_colon)
+                row_obj=TokenSentence(
+                    tokenized_sentence="|".join(new_sentence),
+                    mac_list=existing_row
+                )
+                self.postgresql_tokenized_obj.add_row(row_obj)
+
+
+
+        # all_sentences={}
+        # for i in self.l:
+        #     all_sentences[" ".join(i)]=1
+        #
+        # def recur(token_sentence,index,l):
+        #     if(index>=len(token_sentence)):
+        #         print(l)
+        #         return
+        #
+        #     for word in token_word_s3_mapping[token_sentence[index]]:
+        #
+        #
+
+
+
+
+
+class summary_template:
+    def __init__(self):
+        self.create_postgresql_database()
+        self.postgre_sql_tokenized_sentence()
+        self.create_s3_storage()
+        #self.model = SentenceTransformer('all-MiniLM-L6-v2')
+        #self.get_unique_sentences()
+
+    def create_postgresql_database(self):
+        # If already present with the name - Ignore / Not create Just use same
+        # Else create
+
+        # Fixed format
+        database_table_name = os.environ.get("env_id") + "_token_mapping_table"
+        user_name = os.environ.get("postgresql_username")
+        password = os.environ.get("postgresql_password")
+        host = os.environ.get("postgresql_host")
+        port = os.environ.get("postgresql_port")
+        database_schema = os.environ.get("postgresql_schema")
+
+        database_url = f"postgresql://{user_name}:{password}@{host}:{port}/{database_schema}"
+
+        self.postgresql_obj = DatabaseManager(database_url)
+
+        # This is standard format of table
+        cols = {"token_id": String, "parent_child_value": String}
+        self.postgresql_obj.create_custom_table(database_table_name, cols, primary_key_defined="parent_child_value")
+        self.postgresql_obj.session_local()
+
+        # Object is ready to be used to read or write etc
+
+    def postgre_sql_tokenized_sentence(self):
+        # If already present with the name - Ignore / Not create Just use same
+        # Else create
+
+        # Fixed format
+        database_table_name = os.environ.get("env_id") + "_token_sentence_mac_table"
+        user_name = os.environ.get("postgresql_username")
+        password = os.environ.get("postgresql_password")
+        host = os.environ.get("postgresql_host")
+        port = os.environ.get("postgresql_port")
+        database_schema = os.environ.get("postgresql_schema")
+
+        database_url = f"postgresql://{user_name}:{password}@{host}:{port}/{database_schema}"
+
+        self.postgresql_tokenized_obj = DatabaseManager(database_url)
+
+        # This is standard format of table
+        cols = {"tokenized_sentence": String, "mac_list": ARRAY(MACADDR)}
+        self.postgresql_tokenized_obj.create_custom_table(database_table_name, cols,
+                                                          primary_key_defined="tokenized_sentence")
+        self.postgresql_tokenized_obj.session_local()
+
+        # Object is ready to be used to read or write etc
+
+    def create_s3_storage(self):
+        schema_name = os.environ.get("s3_schema_name")
+        self.s3_object = S3StorageManager(schema_name)
+
+    def to_hex_key(self, index):
+        """Converts 1 to 'c4ca4238a0b923820dcc509a6f75849b'"""
+        # Using md5 analysis
+        return hashlib.md5(str(index).encode()).hexdigest()
+
+
+    def get_unique_sentences(self):
+        self.new_token_to_words_mapping={}
+        for token in self.postgresql_obj.list_all_rows():
+            f.write("\n"+str(token[0])+"   "+str(token[1])+"\n")
+            url=os.environ.get("env_id") + "/token_mapping_s3/" + token[0] + ".jsonl"
+            sen=self.s3_object.get_data(url)
+            # f.write("\n"+str(set(sen))+"\n")
+            # f.write("\n"+str(self.get_top_10_percent_non_similar_words(sen[0],set(sen)))+"\n")
+            # f.write("\n" + "#" * 20 + "\n")
+            self.new_token_to_words_mapping[str(token[0])]=self.get_top_10_percent_non_similar_words(sen[0],set(sen))
+
+        c=1
+        for token_sentence in self.postgresql_tokenized_obj.list_all_rows():
+            sentence=token_sentence[0].split("|")
+            group={}
+            self.expand_token_to_original_sentence(sentence,0,[],group)
+            f.write("\n"+"Group :"+str(c)+"\n")
+            f.write("\n"+token_sentence[0]+"\n")
+            c+=1
+            for i in group:
+                f.write("|=\n"+str(i)+"\n")
+            f.write("\n"+"##"*10+"\n")
+
+
+
+    def expand_token_to_original_sentence(self,sentence,index,l,group):
+        if(index>=len(sentence)):
+            group[tuple(l)]=sentence.copy()
+            return
+
+        list_of_words=self.new_token_to_words_mapping[sentence[index]]
+        if(len(l)>0):
+            if(l[-1] in parents_of_keys_which_are_user_input):
+                new_list=list(self.new_token_to_words_mapping[sentence[index]])
+                list_of_words=new_list[:min(len(new_list),2)]
+        for word in list_of_words:
+            l.append(word)
+            self.expand_token_to_original_sentence(sentence,index+1,l,group)
+            l.pop()
+
+
+    def get_top_10_percent_non_similar_words(self,target_word, word_list):
+
+        # First group it based on database
+        # 1. Group by datatype
+        database_group = {}
+        for word in word_list:
+            t = type(word)
+            if t not in database_group:
+                database_group[t] = []
+            database_group[t].append(word)
+
+        top_10_percent = []
+
+        # 2. Process Strings using Cosine Similarity
+        if str in database_group:
+            model = self.model
+            str_list = list(set(database_group[str]))
+
+            # FIX: Ensure target_word is encoded as a 2D array (1, vector_dim)
+            # Wrapping it in [target_word] does this automatically
+            target_vec = model.encode([str_list[0]])
+            list_vecs = model.encode(str_list)
+
+            # Calculate Similarity
+            similarities = cosine_similarity(target_vec, list_vecs)[0]
+
+            # Pair strings with scores and sort (Ascending for "non-similar")
+            str_score_pairs = list(zip(str_list, similarities))
+            str_score_pairs.sort(key=lambda x: x[1])
+
+            # 3. Calculate the 50% cutoff for strings
+
+
+            # if length of all words > 10 ------------> 10% of the most non-similar words are used
+            # else all elements in list of words is selected
+
+            # Ensure we get at least one if the list isn't empty
+            if len(str_score_pairs) > 0:
+                if(len(str_score_pairs)<=10):
+                    cutoff=len(str_score_pairs)
+                else:
+                    cutoff = math.ceil(len(str_score_pairs) * 0.1)
+            top_10_percent= [word for word, score in str_score_pairs[:cutoff]]
+
+
+        # Add 10 words of each other datatype
+
+        for datatype in database_group:
+            if(datatype!=str):
+                ind=min(len(database_group[datatype]), 10)  # 10 of each datatype or length if there are no 10 elements
+                top_10_percent.extend(database_group[datatype][:ind])
+        return top_10_percent
+
+
+
+l=[]
 payload={
     "shreyas2":{
     "adopted": False,
@@ -2642,40 +3524,118 @@ payload={
     "mist_configured": True
 }
 }
-Build_Splice_tree(payload)
+payload_new={
+    "p1":{
+        "a1":{
+            "b1":{
+                "c1":1,
+                "c2":"string",
+                "c3":1.5,
+                "c4":["new"],
+                "c5":[["newstring1","newstring2"]]
+            },
+            "b2":{
+                "c6":True,
+                "c7":None
+            },
+            "b3":[
+                {
+                    "c8":8,
+                    "c9":9
+                },
+{
+                    "c10":10,
+                    "c11":11
+                }
+            ]
+        }
+    },
 
-# list_of_sentences=[]
+"p2":{
+        "a2":{
+            "b1":{
+                "c1":1,
+                "c2":"string",
+                "c3":1.5,
+                "c4":["new"],
+                "c5":[["newstring1","newstring2"]]
+            },
+            "b2":{
+                "c6":True,
+                "c7":None
+            },
+            "b6":[
+                {
+                    "c8":8,
+                    "c9":9
+                },
+{
+                    "c10":10,
+                    "c11":11
+                }
+            ]
+        }
+    }
+}
+
+
 # for i in payload:
 #     mac=payload[i]["mac"]
 #     l=[]
 #     obj=nested_dict_to_list()
-#     obj.__iter__(payload[i], l)
-#     list_of_sentences.extend(obj.list)
-
-
-# tree_root = build_sentence_tree(list_of_sentences)
-# visualize_tree(tree_root)
-
-
-# all_found_sentences = []
-# get_sentences_dfs(tree_root, [], all_found_sentences)
-# for s in all_found_sentences:
-#     f.write(str(s))
+#     obj.__iter__(payload[i],l)
+#     obj_new=template_generator(obj.list,mac)
 
 
 
-
-
-
-
-
-
-# import pickle
+obj=summary_template()
+# a=obj.postgresql_tokenized_obj.list_all_rows()
 #
-# # To SAVE the tree
-# with open('device_tree.pkl', 'wb') as f:
-#     pickle.dump(tree_root, f)
-#
-# # To LOAD the tree later
-# with open('device_tree.pkl', 'rb') as f:
-#     loaded_tree = pickle.load(f)
+b=obj.postgresql_obj.list_all_rows()
+
+# reverse_list_to_dict(obj.unique_sentences_all)
+
+
+f1=open("temporary2.json","w")
+token_filtered={}
+for i in b:
+    url=os.environ.get("env_id") + "/token_mapping_s3/" + i[0] + ".jsonl"
+    f1.write("###########################")
+    f1.write("\nToken :"+i[0]+"\n")
+    f1.write("\n"+str(type(i[0]))+"\n")
+    f1.write("\nS3 File : "+str(set(obj.s3_object.get_data(url))))
+    data=set(obj.s3_object.get_data(url))
+    list=[]
+    for word in data:
+        list.append(str(word))
+    list.sort()
+    if(tuple(list) not in token_filtered):
+        token_filtered[tuple(list)]=[i[0]]
+    else:
+        token_filtered[tuple(list)].append(i[0])
+    f1.write("###########################")
+
+token_final_filtered={}
+for i in token_filtered:
+    for j in range(0,len(token_filtered[i])):
+        token=token_filtered[i][j]
+        token_final_filtered[token]=token_filtered[i][0]
+
+
+token_sentence_unique_final={}
+for i in obj.postgresql_tokenized_obj.list_all_rows():
+    new_sentence=[]
+    for j in i[0].split("|"):
+        new_sentence.append(token_final_filtered[j])
+    if(tuple(new_sentence) not in token_sentence_unique_final):
+        token_sentence_unique_final[tuple(new_sentence)]=1
+print(len(token_sentence_unique_final))
+
+
+
+# print(len(a))
+# print(len(b))
+# print(len(a))
+# for i in a:
+#     print(i)
+# obj.get_unique_sentences()

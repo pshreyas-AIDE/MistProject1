@@ -1,0 +1,10 @@
+export postgresql_username=user
+export postgresql_password=password
+export postgresql_port=5432
+export postgresql_host=localhost
+export postgresql_schema=my_database
+
+export env_id=staging
+
+export s3_schema_name=shreyas
+export PYTHONPATH=/Users/pshreyas/PycharmProjects/MistProject1

@@ -75,7 +75,6 @@ class S3StorageManager:
             response = self.s3.get_object(Bucket=self.bucket_name, Key=key)
             return json.loads(response['Body'].read().decode('utf-8'))
         except ClientError as e:
-            print(f"Error reading from S3: {e}")
             return None
 
     def upload_consolidated_data(self,token_data):
@@ -102,21 +101,27 @@ class S3StorageManager:
             self.upload_data(key, json.dumps(updated_list))
 
 
-'''
-token_buffer = defaultdict(list)
 
-# Adding data to 4 keys (Simulating findings from your files)
-token_buffer["token2.jsonl"].extend(["routing", "bgp", "juniper"])
-token_buffer["token3.jsonl"].extend(["neural", "network", "weights"])
-token_buffer["token4.jsonl"].extend(["postgres", "docker", "s3"])
-token_buffer["token5.jsonl"].extend(["latency", "jitter", "packet"])
+# token_buffer = defaultdict(list)
+#
+# # Adding data to 4 keys (Simulating findings from your files)
+# token_buffer["token2.jsonl"].extend(["routing", "bgp", "juniper"])
+# token_buffer["token3.jsonl"].extend(["neural", "network", "weights"])
+# token_buffer["token4.jsonl"].extend(["postgres", "docker", "s3"])
+# token_buffer["token5.jsonl"].extend(["latency", "jitter", "packet"])
 
-object=S3StorageManager("shreyas")
-object.upload_data("token1.jsonl",json.dumps(["abc","def","ghi","jkl"]))
-object.upload_consolidated_data(token_buffer)
-print(object.get_data("token2.jsonl"))
-token_buffer["token2.jsonl"].extend(["new-shreyas"])
-object.upload_consolidated_data(token_buffer)
-print(object.get_data("token2.jsonl"))
+# object=S3StorageManager("shreyas")
+# #object.upload_data("token10.jsonl",json.dumps(["abc","def","ghi","jkl","shreyas"]))
+# new=object.get_data("token10.jsonl")
+# if(new):
+#     new.append("new_data")
+#     object.upload_data("token10.jsonl",json.dumps(new))
+#     new = object.get_data("token10.jsonl")
+#     print(new)
+# else:
+#     object.upload_data("token10.jsonl", json.dumps(["abc", "def", "ghi", "jkl", "shreyas"]))
+#     new = object.get_data("token10.jsonl")
+#     print(new)
+# object.upload_data("token1.jsonl",json.dumps(new))
+# print(object.get_data("token1.jsonl"))
 
-'''
