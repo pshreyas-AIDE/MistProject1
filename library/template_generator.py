@@ -46,6 +46,8 @@ class Build_Splice_tree:
         self.create_postgresql_database()
         self.create_s3_storage()
         self.node = self.build_sentence_tree(list_of_sentences)
+        self.get_branch_first_parent()
+
         self.token_to_node_storage={}    # Key=token_id and value=Node associated with the storage
         self.token_to_word_mapping = self.bfs_and_grouping()
         self.grouping_of_keys_with_same_parent_and_child()
@@ -137,6 +139,24 @@ class Build_Splice_tree:
         if self.node.word != "ROOT":
             current_path.pop()
 
+    def get_branch_first_parent(self):
+        root_node=self.node
+        self.branch_parent_mapping={root_node:"ROOT"} # key=node , value=branch main parent
+        for first_parent in root_node.children:
+
+            d=deque()
+            d.append(root_node.children[first_parent])
+            while(len(d)>0):
+                current=d.popleft()
+                if(current not in self.branch_parent_mapping):
+                    self.branch_parent_mapping[current]=first_parent
+                for child in current.children.values():
+                    d.append(child)
+
+
+
+
+
     def bfs_and_grouping(self):
         parent_child_relation = {}
         d = deque()
@@ -147,7 +167,13 @@ class Build_Splice_tree:
         while len(d) > 0:
 
             current = d.popleft()
-            parent_child_tuple = (current[2].word, current[1] - 1, tuple(sorted(current[0].children.keys())),
+
+            # If leaf node - then store (main_parent,parent,{},child_level)
+            if(len(current[0].children)==0):
+                parent_child_tuple = (self.branch_parent_mapping[current[0]],current[2].word,tuple(sorted(current[0].children.keys())),
+                                  current[1] + 1)
+            else:
+                parent_child_tuple=(self.branch_parent_mapping[current[0]],tuple(sorted(current[0].children.keys())),
                                   current[1] + 1)
             if (parent_child_tuple not in parent_child_relation):
                 parent_child_relation[parent_child_tuple] = [current[0].word]
@@ -201,7 +227,17 @@ class Build_Splice_tree:
 
             # parent_child_tuple = (current[2].word, current[1] - 1, tuple(sorted(current[0].children.keys())),
             #                       current[1] + 1)
-            parent_child_representation = (parent_node.word, current_level - 1, child_node_key, current_level + 1)
+            # parent_child_representation = (parent_node.word, current_level - 1, child_node_key, current_level + 1)
+
+
+            # If leaf node - then store (main_parent,parent,{},child_level)
+            if(len(current_node.children)==0):
+                parent_child_representation = (self.branch_parent_mapping[current_node],parent_node.word,tuple(sorted(current_node.children.keys())),
+                                  current_level + 1)
+            else:
+                parent_child_representation=(self.branch_parent_mapping[current_node],tuple(sorted(current_node.children.keys())),
+                                  current_level + 1)
+
             token_id = self.to_hex_key(parent_child_representation)
             value = json.dumps(list(parent_child_representation))
             if (token_id not in self.token_to_node_storage):
@@ -261,10 +297,13 @@ class Build_Splice_tree:
 
         vis[node]=1
         for child in node.children.values():
-            if(child not in vis):
-                l.append(node)
-                self.dfs(child,vis,l,result)
-                l.pop()
+            l.append(node)
+            self.dfs(child, vis, l, result)
+            l.pop()
+            # if(child not in vis):
+            #     l.append(node)
+            #     self.dfs(child,vis,l,result)
+            #     l.pop()
 
 
         if(len(node.children)==0):
@@ -348,6 +387,7 @@ class Build_Splice_tree:
                     result[sentence]=[l.copy()]
                 else:
                     result[sentence].append(l.copy())
+                print(l)
                 return
 
             s3_file_path=os.environ.get("env_id") + "/token_to_word_mapping/" + sentence[index] + ".jsonl"
