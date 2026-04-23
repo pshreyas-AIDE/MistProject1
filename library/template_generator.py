@@ -1,7 +1,7 @@
 from collections import deque
 import json
 import hashlib # To get unique Token name which will not be used in payload
-
+import ast
 from boto3.dynamodb.types import LIST
 
 from library.s3_library import S3StorageManager
@@ -26,7 +26,6 @@ class SentenceNode:
 
 
 
-
 class TokenDatabase(Base):
     __tablename__ = os.environ.get("env_id") + "_token_to_s3_file_table"
     token_id = Column(String, primary_key=True)
@@ -47,17 +46,19 @@ class Build_Splice_tree:
         self.create_postgresql_database()
         self.create_s3_storage()
         self.node = self.build_sentence_tree(list_of_sentences)
-        # vis = {}
-        # result = {}
-        # self.dfs(self.node, vis, [], result)
+        self.token_to_node_storage={}    # Key=token_id and value=Node associated with the storage
         self.token_to_word_mapping = self.bfs_and_grouping()
         self.grouping_of_keys_with_same_parent_and_child()
+
+
         self.get_all_postgresql_rows()
         vis={}
         self.final_template_sentences={}
         self.dfs(self.node,vis,[],self.final_template_sentences)
+        print(len(self.final_template_sentences))
         self.model = SentenceTransformer('all-MiniLM-L6-v2')
-        self.get_template()
+        self.generalized_sentences_list=self.get_template()
+        self.reverse_engineering()
 
 
     def create_postgresql_database(self):
@@ -146,9 +147,6 @@ class Build_Splice_tree:
         while len(d) > 0:
 
             current = d.popleft()
-            f.write("%%%%%%%%%%%"+"\n")
-            f.write("\n"+str(current[0].word)+"\n"+str(current[0].children.keys())+"\n")
-            f.write("%%%%%%%%" * 10+"\n")
             parent_child_tuple = (current[2].word, current[1] - 1, tuple(sorted(current[0].children.keys())),
                                   current[1] + 1)
             if (parent_child_tuple not in parent_child_relation):
@@ -178,6 +176,48 @@ class Build_Splice_tree:
 
     def grouping_of_keys_with_same_parent_and_child(self):
 
+
+
+
+
+        # Do BFS traversal
+        d = deque()
+        d.append([self.node, 0, self.node, self.node.children.values()])
+        level_parent_child_list=[]
+        while len(d) > 0:
+            current = d.popleft()
+            list_of_children = current[0].children.values()
+            for child in list_of_children:
+                d.append([child, current[1] + 1, current[0], child.children.values()])
+            if(current[1]>1):
+                level_parent_child_list.append([current[1],current[0],current[2],current[3]])
+        level_parent_child_list.sort(key=lambda x: x[0],reverse=True)
+        for node in level_parent_child_list:
+            current_level=node[0]
+            current_node = node[1]
+            parent_node = node[2]
+            child_nodes = current_node.children.values()
+            child_node_key=tuple(sorted(current_node.children.keys()))
+
+            # parent_child_tuple = (current[2].word, current[1] - 1, tuple(sorted(current[0].children.keys())),
+            #                       current[1] + 1)
+            parent_child_representation = (parent_node.word, current_level - 1, child_node_key, current_level + 1)
+            token_id = self.to_hex_key(parent_child_representation)
+            value = json.dumps(list(parent_child_representation))
+            if (token_id not in self.token_to_node_storage):
+                new_node = SentenceNode(token_id)
+                new_node.children = current_node.children
+                self.token_to_node_storage[token_id] = new_node
+                if(parent_child_representation not in self.token_to_word_mapping):
+                    self.token_to_word_mapping[parent_child_representation]=[current_node.word]
+                else:
+                    self.token_to_word_mapping[parent_child_representation].append(current_node.word)
+            else:
+                self.token_to_node_storage[token_id].children = self.token_to_node_storage[
+                                                                    token_id].children | current_node.children
+            parent_node.children[token_id] = self.token_to_node_storage[token_id]
+            if (current_node.word in parent_node.children):
+                del parent_node.children[current_node.word]
 
         # Update the grouped Token to word mapping to database
         for key in self.token_to_word_mapping:
@@ -209,49 +249,13 @@ class Build_Splice_tree:
                 )
                 self.postgresql_obj.add_row(row_obj)
 
-        # Replace nodes with same parent and child with new Node with Value=Token and children same
-        # Parse BFS and do this
-        d = deque()
-        d.append([self.node, 0, self.node, self.node.children.values()])
-        # node,level,parent node,list of child nodes )
-        grouped_new_node={}  # key - parent , value node ( which is summary node of multiple nodes )
-        vis={}
-        to_be_deleted={} # key parent , value - child value to be deleted from parent
-        while len(d) > 0:
-
-            current = d.popleft()
-            parent_child_tuple = (current[2].word, current[1] - 1, tuple(sorted(current[0].children.keys())),
-                                  current[1] + 1)
-            token_id = self.to_hex_key(parent_child_tuple)
-
-            # Check if this is already visited or else in vis
-            if(current[1]>1):
-                if(parent_child_tuple not in vis):
-                    new_summary_node=SentenceNode(str(token_id))     # New node value is token id and its children will be same as current node
-                    new_summary_node.children=current[0].children
-                    grouped_new_node[current[2]]=new_summary_node # Add new summary node as child of parent
-                    vis[parent_child_tuple]=1
 
 
-            list_of_children = current[0].children.values()
-            for child in list_of_children:
-                d.append([child, current[1] + 1, current[0], child.children.values()])
 
-            if(current[1]>1):
-                if(current[2] not in to_be_deleted):
-                    to_be_deleted[current[2]]=[current[0].word]
-                else:
-                    to_be_deleted[current[2]].append(current[0].word)
-
-        for parent in grouped_new_node:
-            parent.children[grouped_new_node[parent].word]=grouped_new_node[parent]
-        for parent in to_be_deleted:
-            for word in to_be_deleted[parent]:
-                if(word!="ROOT"):
-                    del parent.children[word]
 
     def dfs(self,node,vis,l,result):
         if(node==None):
+            print(l)
             return
 
 
@@ -337,30 +341,34 @@ class Build_Splice_tree:
         return top_10_percent
 
     def get_template(self):
-
-        def recursion(sentence,index,l,result):
+        result = {}
+        def recursion(sentence,index,l):
             if(index>=len(sentence)):
-                print(l)
+                if(sentence not in result):
+                    result[sentence]=[l.copy()]
+                else:
+                    result[sentence].append(l.copy())
                 return
 
             s3_file_path=os.environ.get("env_id") + "/token_to_word_mapping/" + sentence[index] + ".jsonl"
             s3_data=self.s3_object.get_data(s3_file_path)
             if(s3_data==None):
                 l.append(sentence[index])
-                recursion(sentence,index+1,l,result)
+                recursion(sentence,index+1,l)
                 l.pop()
             else:
                 top_10_percent=self.get_top_10_percent_non_similar_words(s3_data[0],s3_data)
                 for word in top_10_percent:
                     l.append(word)
-                    recursion(sentence, index + 1, l, result)
+                    recursion(sentence, index + 1, l)
                     l.pop()
+
 
         for sentence in self.final_template_sentences:
             print("###############################")
-            print(sentence)
-            recursion(sentence, 0, [], {})
+            recursion(sentence, 0, [])
             print("###############################")
+        return result
 
     def get_all_postgresql_rows(self):
         self.postgre_sql_mapping={} # Parent_child - Key and Value=token-id
@@ -370,6 +378,92 @@ class Build_Splice_tree:
 
             if(parent_child not in self.postgre_sql_mapping):
                 self.postgre_sql_mapping[parent_child]=token_id
+
+
+    def reverse_engineering(self):
+
+        def nest_sentence(sentence):
+            words = sentence
+            nested_dict = words[-1]
+            if nested_dict == "$|Empty List|$":
+                nested_dict = []
+            elif "%[[[[[[%" in str(nested_dict) and "%]]]]]]%" in str(nested_dict):
+                clean_val = str(nested_dict).replace("%[[[[[[%", "").replace("%]]]]]]%", "")
+                nested_dict = ast.literal_eval(clean_val)
+
+            elif ("$|List of Lists|$" in str(nested_dict)):
+                words = str(nested_dict).split("$|List of Lists|$")
+                nested_dict = []
+                for w in words:
+                    nested_dict.append(ast.literal_eval(w))
+            # Iterate through words in reverse
+
+            for word in reversed(words[:len(words) - 1]):
+                # The current word becomes a key, and the previous
+                # nested structure becomes its value
+                if (word == "%|List_Of_Dictionary|%"):
+                    nested_dict = [nested_dict]
+                elif (word == "$|Empty List|$"):
+                    nested_dict = []
+                elif ("%[[[[[[%" in word and "%]]]]]]%" in word):
+                    word = word.replace("%[[[[[[%", "")
+                    word = word.replace("%]]]]]]%", "")
+                    actual_list = ast.literal_eval(word)
+                    nested_dict = actual_list
+                elif ("$|List of Lists|$" in word):
+                    words = word.split("$|List of Lists|$")
+                    nested_dict = []
+                    for w in words:
+                        nested_dict.append(ast.literal_eval(w))
+                else:
+                    nested_dict = {word: nested_dict}
+
+            return nested_dict
+
+        def deep_merge(dict1, dict2):
+            """
+            Recursively merges dict2 into dict1, specifically handling
+            lists of dictionaries found in your network templates.
+            """
+            for key, value in dict2.items():
+                if key in dict1:
+                    # Case 1: Both are dictionaries - Recurse
+                    if isinstance(dict1[key], dict) and isinstance(value, dict):
+                        deep_merge(dict1[key], value)
+
+                    # Case 2: Both are lists - Merge internal dictionaries
+                    elif isinstance(dict1[key], list) and isinstance(value, list):
+                        # For network configs, we usually merge the first elements
+                        # if they represent the same configuration block.
+                        if len(dict1[key]) > 0 and len(value) > 0:
+                            if isinstance(dict1[key][0], dict) and isinstance(value[0], dict):
+                                deep_merge(dict1[key][0], value[0])
+                            else:
+                                dict1[key].extend(value)
+                        else:
+                            dict1[key].extend(value)
+                    else:
+                        dict1[key] = value
+                else:
+                    # Case 3: Key doesn't exist - Add it
+                    dict1[key] = value
+            return dict1
+
+        result={}
+        l={}
+        for sentence in self.generalized_sentences_list:
+            for i in range(len(self.generalized_sentences_list[sentence])):
+                if(i not in l):
+                    l[i]=[self.generalized_sentences_list[sentence][i]]
+                else:
+                    l[i].append(self.generalized_sentences_list[sentence][i])
+
+        for i in l:
+            res={}
+            for sentence in l[i]:
+                result=deep_merge(result,nest_sentence(sentence))
+        f.write("\n"+str(result)+"\n")
+        pass# Replace words with meaningful
 
 
 class nested_dict_to_list:
