@@ -10,7 +10,6 @@
         .sidebar { width: 280px; height: 100vh; position: fixed; background: #1c1e21; color: white; padding: 25px 20px; transition: filter 0.3s ease; z-index: 100; display: flex; flex-direction: column; }
         .main-content { margin-left: 280px; padding: 40px; transition: filter 0.3s ease; }
 
-        /* New Blur Effect Class */
         .modal-active-blur {
             filter: blur(5px) grayscale(20%);
             pointer-events: none;
@@ -24,19 +23,22 @@
         .status-badge { font-size: 0.75rem; font-weight: bold; padding: 2px 8px; border-radius: 4px; }
         .pending { color: #856404; background: #fff3cd; }
         .analyzed { color: #6c757d; background: #e9ecef; }
-        #file-display { font-size: 0.8rem; color: #0d6efd; margin-top: 5px; display: block; font-weight: bold; min-height: 1.2rem; }
+
+        /* Updated: Removes ellipsis and allows full filename wrapping */
+        #file-display {
+            font-size: 0.8rem;
+            color: #0d6efd;
+            margin-top: 5px;
+            display: block;
+            font-weight: bold;
+            min-height: 1.2rem;
+            word-break: break-all;
+            white-space: normal;
+        }
 
         .loading-container { display: none; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; padding: 15px; }
         .progress { height: 8px; border-radius: 4px; }
         .spinner-grow-sm { width: 0.8rem; height: 0.8rem; }
-
-        .modal.minimized { pointer-events: none; overflow: hidden !important; }
-        .modal.minimized .modal-dialog { position: fixed; bottom: 20px; left: 300px; margin: 0; width: 320px; pointer-events: auto; z-index: 9999; }
-        .modal.minimized .modal-content { box-shadow: 0 8px 30px rgba(0,0,0,0.2); border: 2px solid #0d6efd; border-radius: 12px; }
-        .modal.minimized .modal-body, .modal.minimized .modal-footer { display: none; }
-
-        .btn-minimize { background: transparent; border: none; padding: 0; margin-right: 15px; color: #000; opacity: 0.5; transition: opacity 0.2s, color 0.2s; display: flex; align-items: center; justify-content: center; font-size: 1.25rem; }
-        .btn-minimize:hover { opacity: 0.75; color: #000; }
 
         .mac-grid-item { transition: transform 0.1s; }
         .mac-grid-item:hover { transform: scale(1.02); z-index: 1; }
@@ -48,7 +50,6 @@
         .btn-group .btn-outline-secondary { border-left: none; background-color: #f8f9fa; color: #6c757d; border-color: #dee2e6; transition: all 0.2s; }
         .btn-group .btn-outline-secondary:hover { background-color: #e9ecef; color: #dc3545; border-color: #dee2e6; }
 
-        /* Fancy Toast Notification */
         .custom-alert {
             position: fixed;
             top: 20px;
@@ -58,12 +59,13 @@
             background: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(10px);
             border-radius: 12px;
-            border-left: 5px solid #0d6efd; /* Blue for success */
+            border-left: 5px solid #0d6efd;
             box-shadow: 0 10px 30px rgba(0,0,0,0.15);
             display: flex;
             align-items: center;
-            padding: 16px 20px;
+            padding: 166px 20px;
             animation: slideInRight 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+            padding: 16px 20px;
         }
 
         @keyframes slideInRight {
@@ -78,6 +80,49 @@
         @keyframes slideOutRight {
             from { transform: translateX(0); opacity: 1; }
             to { transform: translateX(120%); opacity: 0; }
+        }
+
+        .form-select {
+            appearance: none;
+            -webkit-appearance: none;
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%230d6efd' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
+            background-repeat: no-repeat;
+            background-position: right 1rem center;
+            background-size: 16px 12px;
+            border: 2px solid #dee2e6;
+            border-radius: 10px;
+            padding: 12px 16px;
+            font-size: 0.95rem;
+            color: #495057;
+            transition: all 0.2s ease-in-out;
+            background-color: #ffffff;
+        }
+
+        .form-select:focus {
+            border-color: #0d6efd;
+            box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.15);
+            outline: 0;
+        }
+
+        .form-select:disabled {
+            background-color: #f8f9fa;
+            border-color: #e9ecef;
+            color: #adb5bd;
+            cursor: not-allowed;
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23adb5bd' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
+        }
+
+        .s3-step-number {
+            display: inline-block;
+            width: 24px;
+            height: 24px;
+            line-height: 24px;
+            text-align: center;
+            background: #0d6efd;
+            color: white;
+            border-radius: 50%;
+            font-size: 0.75rem;
+            margin-right: 8px;
         }
     </style>
 </head>
@@ -106,27 +151,27 @@
 
 <div id="main-content-container" class="main-content">
     <div id="alert-container">
-    {% with messages = get_flashed_messages(with_categories=true) %}
-      {% if messages %}
-        {% for category, message in messages %}
-          <div class="custom-alert border-{{ 'primary' if category == 'success' else 'danger' }}" role="alert">
-            <div class="me-3">
-                {% if category == 'success' %}
-                    <i class="bi bi-check-circle-fill text-primary fs-4"></i>
-                {% else %}
-                    <i class="bi bi-exclamation-triangle-fill text-danger fs-4"></i>
-                {% endif %}
-            </div>
-            <div>
-                <div class="fw-bold text-dark" style="font-size: 0.9rem;">System Notification</div>
-                <div class="text-muted small">{{ message }}</div>
-            </div>
-            <button type="button" class="btn-close ms-auto" onclick="this.parentElement.remove()"></button>
-          </div>
-        {% endfor %}
-      {% endif %}
-    {% endwith %}
-</div>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            {% for category, message in messages %}
+              <div class="custom-alert border-{{ 'primary' if category == 'success' else 'danger' }}" role="alert">
+                <div class="me-3">
+                    {% if category == 'success' %}
+                        <i class="bi bi-check-circle-fill text-primary fs-4"></i>
+                    {% else %}
+                        <i class="bi bi-exclamation-triangle-fill text-danger fs-4"></i>
+                    {% endif %}
+                </div>
+                <div>
+                    <div class="fw-bold text-dark" style="font-size: 0.9rem;">System Notification</div>
+                    <div class="text-muted small">{{ message }}</div>
+                </div>
+                <button type="button" class="btn-close ms-auto" onclick="this.parentElement.remove()"></button>
+              </div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
+    </div>
 
     {% if view == 'dashboard' %}
         <div class="d-flex justify-content-between align-items-center mb-4">
@@ -137,12 +182,23 @@
             <div class="col-md-4">
                 <div class="card p-4 shadow-sm border-0 mb-4">
                     <form action="/analyze" method="post" enctype="multipart/form-data" id="uploadForm">
-                        <label class="form-label fw-bold text-muted small">SELECT JSON FILE ONLY</label>
-                        <input type="file" name="file" id="fileInput" class="form-control mb-1" accept=".json" required>
-                        <span id="file-display"></span>
+                        <label class="form-label fw-bold text-muted small">DATA SOURCE</label>
+
+                        <button type="button" class="btn btn-outline-primary w-100 fw-bold py-2 mb-2" data-bs-toggle="modal" data-bs-target="#s3PickerModal">
+                            <i class="bi bi-cloud-arrow-down-fill me-2"></i> Browse S3 Bucket
+                        </button>
+
+                        <input type="hidden" name="s3_path" id="s3PathInput">
+
+                        <div class="d-flex align-items-start mt-2">
+                            <span id="file-display" class="flex-grow-1"></span>
+                            <button type="button" id="removeFileBtn" class="btn badge rounded-pill bg-danger-subtle text-danger border-0 ms-2" style="display: none; padding: 6px;" onclick="removeSelectedFile()" title="Remove selection">
+                                <i class="bi bi-x-lg"></i>
+                            </button>
+                        </div>
 
                         <div id="btn-wrapper" class="mt-3">
-                            <button type="submit" id="analyzeBtn" class="btn btn-primary w-100 fw-bold">🚀 Analyze Diff</button>
+                            <button type="submit" id="analyzeBtn" class="btn btn-primary w-100 fw-bold" disabled>🚀 Analyze Diff</button>
                         </div>
 
                         <div id="loadingState" class="loading-container mt-3">
@@ -151,7 +207,6 @@
                                     <span class="spinner-grow spinner-grow-sm me-1" role="status"></span>
                                     PROCESSING DIFF...
                                 </span>
-                                <span class="badge bg-soft-primary text-primary small">Please wait</span>
                             </div>
                             <div class="progress">
                                 <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 100%"></div>
@@ -159,14 +214,6 @@
                         </div>
                     </form>
                 </div>
-
-                {% if groups %}
-                <div class="card p-4 shadow-sm border-0">
-                    <h6 class="fw-bold text-muted small mb-3">JIRA OPERATIONS</h6>
-                    <button class="btn btn-outline-primary w-100 mb-2" data-bs-toggle="modal" data-bs-target="#createJiraModal">➕ Create Jira</button>
-                    <button class="btn btn-outline-secondary w-100" disabled>🔍 Find Jira</button>
-                </div>
-                {% endif %}
             </div>
 
             <div class="col-md-8">
@@ -174,10 +221,11 @@
                     <div class="accordion" id="papiAcc">
                         {% for g in groups %}
                         <div class="accordion-item mb-3 border-0 shadow-sm overflow-hidden" style="border-radius: 10px;">
-                            <h2 class="accordion-header">
+                            <h2 class="accordion-header position-relative">
                                 <button class="accordion-button collapsed fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#g{{g.id}}">
                                     Group {{g.id}} <span class="badge bg-primary ms-3">{{g.macs|length}} Devices</span>
                                 </button>
+                                <a href="/group/{{g.id}}" class="btn btn-sm btn-primary position-absolute top-50 translate-middle-y end-0 me-5 fw-bold" style="z-index: 5;">View Detail</a>
                             </h2>
                             <div id="g{{g.id}}" class="accordion-collapse collapse" data-bs-parent="#papiAcc">
                                 <div class="accordion-body bg-light">
@@ -209,12 +257,6 @@
                                             {% endfor %}
                                         </div>
                                     </div>
-                                    {% if g.added_errors or g.removed_errors %}
-                                    <div class="mt-3 pt-3 border-top">
-                                        {% if g.added_errors %}<p class="small text-danger fw-bold mb-1">⚠️ ADDED ERRORS:</p><ul class="small fw-bold text-dark">{% for e in g.added_errors %}<li>{{e}}</li>{% endfor %}</ul>{% endif %}
-                                        {% if g.removed_errors %}<p class="small text-danger fw-bold mb-1">⚠️ REMOVED ERRORS:</p><ul class="small fw-bold text-dark">{% for e in g.removed_errors %}<li>{{e}}</li>{% endfor %}</ul>{% endif %}
-                                    </div>
-                                    {% endif %}
                                 </div>
                             </div>
                         </div>
@@ -286,13 +328,8 @@
                                 </div>
                             {% else %}
                                 <div class="text-center my-5">
-                                    {% if not pattern %}
-                                        <i class="bi bi-info-circle text-muted d-block mb-2" style="font-size: 2rem;"></i>
-                                        <h5 class="text-muted fw-bold">Please Enter the pattern and config type.</h5>
-                                    {% else %}
-                                        <i class="bi bi-exclamation-circle text-danger d-block mb-2" style="font-size: 2rem;"></i>
-                                        <h5 class="text-danger fw-bold">No devices matching this pattern found.</h5>
-                                    {% endif %}
+                                    <i class="bi bi-exclamation-circle text-danger d-block mb-2" style="font-size: 2rem;"></i>
+                                    <h5 class="text-danger fw-bold">No devices matching this pattern found.</h5>
                                 </div>
                             {% endif %}
                         </div>
@@ -303,99 +340,125 @@
     {% endif %}
 </div>
 
-<div class="modal fade" id="createJiraModal" data-bs-backdrop="true" tabindex="-1">
-  <div class="modal-dialog shadow-lg">
-    <div class="modal-content">
-      <form action="/create_jira" method="post" id="jiraForm">
-        <div class="modal-header d-flex align-items-center">
-            <h5 class="modal-title fw-bold">Create Jira Ticket</h5>
-            <div class="ms-auto d-flex align-items-center">
-                <button type="button" class="btn-minimize" onclick="toggleMinimize()"><i class="bi bi-dash-lg" id="toggleIcon"></i></button>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
+<div class="modal fade" id="s3PickerModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg" style="border-radius: 15px;">
+      <div class="modal-header bg-primary text-white border-0" style="border-radius: 15px 15px 0 0; padding: 20px;">
+        <h5 class="modal-title fw-bold m-0"><i class="bi bi-database-fill-gear me-2"></i>S3 File Browser</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-4">
+        <div class="mb-4">
+          <label class="form-label small fw-bold text-muted text-uppercase"><span class="s3-step-number">1</span> Environment</label>
+          <select id="envDrop" class="form-select shadow-sm">
+              <option selected disabled>Choose Env...</option>
+          </select>
         </div>
-        <div class="modal-body">
-            <div class="mb-3"><label class="form-label small fw-bold">Summary</label><input type="text" name="summary" class="form-control" required></div>
-            <div class="mb-3"><label class="form-label small fw-bold">Description</label><textarea name="description" class="form-control" rows="4" required></textarea></div>
-            <div class="mb-3"><label class="form-label small fw-bold">Issue Type</label><select name="issue_type" class="form-select"><option value="Task">Task</option><option value="Bug">Bug</option></select></div>
-            <div class="mb-3"><label class="form-label small fw-bold">Labels</label><input type="text" name="labels" class="form-control" placeholder="e.g. papi, switch"></div>
+        <div class="mb-4">
+          <label class="form-label small fw-bold text-muted text-uppercase"><span class="s3-step-number">2</span> Version</label>
+          <select id="versionDrop" class="form-select shadow-sm" disabled>
+              <option selected disabled>Select Env First...</option>
+          </select>
         </div>
-        <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button><button type="submit" class="btn btn-primary">Save Ticket</button></div>
-      </form>
+        <div class="mb-2">
+          <label class="form-label small fw-bold text-muted text-uppercase"><span class="s3-step-number">3</span> Target JSON File</label>
+          <select id="fileDrop" class="form-select shadow-sm" disabled>
+              <option selected disabled>Select Version First...</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer bg-light border-0" style="padding: 15px 25px; border-radius: 0 0 15px 15px;">
+        <button type="button" class="btn btn-link text-muted fw-bold text-decoration-none" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" id="confirmS3Btn" class="btn btn-primary px-4 fw-bold shadow-sm" onclick="selectS3File()" disabled>Confirm Selection</button>
+      </div>
     </div>
   </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-    const fIn = document.getElementById('fileInput'), fDisp = document.getElementById('file-display'), uForm = document.getElementById('uploadForm');
-
-    // Jira Modal Blur and Reset Logic
-    const jiraModal = document.getElementById('createJiraModal');
+    const fDisp = document.getElementById('file-display');
     const mainContent = document.getElementById('main-content-container');
     const sidebar = document.getElementById('sidebar-container');
-    const jiraForm = document.getElementById('jiraForm');
-    const toggleIcon = document.getElementById('toggleIcon');
+    const analyzeBtn = document.getElementById('analyzeBtn');
+    const uploadForm = document.getElementById('uploadForm');
+    const s3PathInput = document.getElementById('s3PathInput');
+    const removeFileBtn = document.getElementById('removeFileBtn');
 
-    jiraModal.addEventListener('show.bs.modal', function () {
-        if (!jiraModal.classList.contains('minimized')) {
-            mainContent.classList.add('modal-active-blur');
-            sidebar.classList.add('modal-active-blur');
-        }
+    const envDrop = document.getElementById('envDrop');
+    const versionDrop = document.getElementById('versionDrop');
+    const fileDrop = document.getElementById('fileDrop');
+    const confirmBtn = document.getElementById('confirmS3Btn');
+    const s3Modal = document.getElementById('s3PickerModal');
+
+    // --- MODAL & DATA FETCHING ---
+    s3Modal.addEventListener('show.bs.modal', function () {
+        mainContent.classList.add('modal-active-blur');
+        sidebar.classList.add('modal-active-blur');
+        fetch('/get_envs').then(res => res.json()).then(data => {
+            envDrop.innerHTML = '<option selected disabled>Choose Env...</option>';
+            data.forEach(env => envDrop.innerHTML += `<option value="${env}">${env}</option>`);
+        });
     });
 
-    jiraModal.addEventListener('hidden.bs.modal', function () {
+    s3Modal.addEventListener('hidden.bs.modal', function () {
         mainContent.classList.remove('modal-active-blur');
         sidebar.classList.remove('modal-active-blur');
-
-        // ALWAYS RESET FORM AND STATE ON CLOSE
-        // This ensures if it's closed (even from minimized state), it resets.
-        jiraForm.reset();
-
-        // Remove minimized class so it opens normally next time
-        jiraModal.classList.remove('minimized');
-
-        // Reset the icon and backdrop visibility
-        if(toggleIcon) toggleIcon.className = "bi bi-dash-lg";
-        const backdrop = document.querySelector('.modal-backdrop');
-        if (backdrop) backdrop.style.visibility = 'visible';
     });
 
-    // Analyze Diff Loading Logic
-    if (uForm) {
-        uForm.addEventListener('submit', function() {
-            if (fIn.files.length > 0) {
-                document.getElementById('btn-wrapper').style.display = 'none';
-                document.getElementById('loadingState').style.display = 'block';
-                sessionStorage.setItem('pName', fIn.files[0].name);
-            }
+    envDrop.addEventListener('change', function() {
+        fetch(`/get_versions/${this.value}`).then(res => res.json()).then(data => {
+            versionDrop.innerHTML = '<option selected disabled>Choose Version...</option>';
+            data.forEach(v => versionDrop.innerHTML += `<option value="${v}">${v}</option>`);
+            versionDrop.disabled = false;
+            fileDrop.disabled = true;
+            confirmBtn.disabled = true;
         });
+    });
+
+    versionDrop.addEventListener('change', function() {
+        fetch(`/get_s3_files/${envDrop.value}/${this.value}`).then(res => res.json()).then(data => {
+            fileDrop.innerHTML = '<option selected disabled>Choose File...</option>';
+            data.forEach(f => fileDrop.innerHTML += `<option value="${f}">${f}</option>`);
+            fileDrop.disabled = false;
+        });
+    });
+
+    fileDrop.addEventListener('change', () => confirmBtn.disabled = false);
+
+    // --- SELECTION & REMOVAL ---
+    function selectS3File() {
+        const file = fileDrop.value;
+        s3PathInput.value = `${envDrop.value}/${versionDrop.value}/${file}`;
+        fDisp.innerText = "Selected S3 File: " + file;
+        sessionStorage.setItem('pName', file);
+        if(removeFileBtn) removeFileBtn.style.display = 'flex';
+        analyzeBtn.disabled = false;
+        bootstrap.Modal.getInstance(s3Modal).hide();
     }
+
+    function removeSelectedFile() {
+        s3PathInput.value = "";
+        sessionStorage.removeItem('pName');
+        fDisp.innerText = "";
+        if(removeFileBtn) removeFileBtn.style.display = 'none';
+        analyzeBtn.disabled = true;
+        envDrop.selectedIndex = 0;
+        versionDrop.disabled = true;
+        fileDrop.disabled = true;
+    }
+
+    uploadForm.addEventListener('submit', function() {
+        document.getElementById('btn-wrapper').style.display = 'none';
+        document.getElementById('loadingState').style.display = 'block';
+    });
 
     function clearAll() {
-    sessionStorage.removeItem('pName');
-    if (fDisp) fDisp.innerText = "";
-    window.location.href = "/reset";
-}
-
-    function toggleMinimize() {
-        const modal = document.getElementById('createJiraModal'), icon = document.getElementById('toggleIcon'), backdrop = document.querySelector('.modal-backdrop');
-        modal.classList.toggle('minimized');
-
-        if (modal.classList.contains('minimized')) {
-            icon.className = "bi bi-arrows-angle-expand";
-            if (backdrop) backdrop.style.visibility = 'hidden';
-            mainContent.classList.remove('modal-active-blur');
-            sidebar.classList.remove('modal-active-blur');
-        }
-        else {
-            icon.className = "bi bi-dash-lg";
-            if (backdrop) backdrop.style.visibility = 'visible';
-            mainContent.classList.add('modal-active-blur');
-            sidebar.classList.add('modal-active-blur');
-        }
+        sessionStorage.removeItem('pName');
+        window.location.href = "/reset";
     }
 
+    // --- SEARCH & FILTERING ---
     let typingTimer;
     function filterMacs() { clearTimeout(typingTimer); typingTimer = setTimeout(performFilter, 50); }
     function resetMacSearch() { const input = document.getElementById('macSearchInput'); if (input) { input.value = ''; performFilter(); } }
@@ -415,35 +478,22 @@
         if (alertBox) alertBox.style.display = (visibleCount === 0) ? 'block' : 'none';
     }
 
-    if (performance.navigation.type === performance.navigation.TYPE_RELOAD) { clearAll(); }
-    window.onload = () => { const n = sessionStorage.getItem('pName'); if (n && fDisp) fDisp.innerText = "Current File: " + n; };
-
     window.onload = () => {
-        // 1. Check if the backend passed the new_login flag
-        const isNewLogin = "{{ new_login }}";
-
-        if (isNewLogin === "true") {
-            // Clear the stored filename from browser memory
-            sessionStorage.removeItem('pName');
-        }
-
-        // 2. Only display the filename if it still exists in storage
         const n = sessionStorage.getItem('pName');
         if (n && fDisp) {
             fDisp.innerText = "Current File: " + n;
-        } else if (fDisp) {
-            fDisp.innerText = ""; // Ensure it's empty if no name exists
+            if(removeFileBtn) removeFileBtn.style.display = 'flex';
+            analyzeBtn.disabled = false;
         }
     };
-    // Auto-dismiss alerts after 1 second
-    // Auto-hide fancy alerts after 4 seconds
-setTimeout(function() {
-    let alerts = document.querySelectorAll('.custom-alert');
-    alerts.forEach(function(alert) {
-        alert.classList.add('alert-exit'); // Trigger exit animation
-        setTimeout(() => alert.remove(), 500); // Remove from DOM after animation
-    });
-}, 4000);
+
+    setTimeout(function() {
+        let alerts = document.querySelectorAll('.custom-alert');
+        alerts.forEach(function(alert) {
+            alert.classList.add('alert-exit');
+            setTimeout(() => alert.remove(), 500);
+        });
+    }, 4000);
 </script>
 </body>
 </html>

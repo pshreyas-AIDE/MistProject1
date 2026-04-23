@@ -3,11 +3,12 @@ import json
 import io
 import zipfile
 import psycopg2
-from flask import Flask, render_template, request, session, redirect, url_for, send_file, flash
+from flask import Flask, render_template, request, session, redirect, url_for, send_file, flash, jsonify
 from flask_session import Session
 from psycopg2.extras import RealDictCursor
 from werkzeug.security import generate_password_hash, check_password_hash
 from library.jira_integrator import JiraToolkit
+from library.s3_library import S3StorageManager
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'papi_secure_session_key_2026'
@@ -17,6 +18,14 @@ app.config['SESSION_PERMANENT'] = True
 Session(app)
 
 
+
+# --- S3 Connection ---
+s3_handler = S3StorageManager(
+    bucket_name="papi",
+    endpoint_url="http://localhost:9005", # Matching your lib's default
+    username="admin",
+    aws_secret_key="password123"
+)
 # --- DATABASE CONFIG ---
 def get_db_connection():
     # Update these credentials with your local Postgres settings
@@ -107,13 +116,19 @@ def index():
 @app.route('/analyze', methods=['POST'])
 def analyze():
     if 'user_id' not in session: return redirect(url_for('auth_page'))
-    file = request.files.get('file')
-    if not file or not file.filename.endswith('.json'): return redirect('/')
 
-    payload = json.load(file)
-    ui_groups, text_report = Diff_Analyzer().analyze_diff(payload)
-    session['payload'], session['ui_groups'], session['text_report'] = payload, ui_groups, text_report
-    session.modified = True
+    s3_path = request.form.get('s3_path')
+    if s3_path:
+        payload = s3_handler.get_data(s3_path)
+    else:
+        file = request.files.get('file')
+        if not file or not file.filename.endswith('.json'): return redirect('/')
+        payload = json.load(file)
+
+    if payload:
+        ui_groups, text_report = Diff_Analyzer().analyze_diff(payload)
+        session['payload'], session['ui_groups'], session['text_report'] = payload, ui_groups, text_report
+        session.modified = True
     return redirect('/')
 
 
@@ -269,6 +284,41 @@ def reset():
     session.modified = True
     return redirect('/')
 
+
+@app.route('/group/<int:group_id>')
+def group_detail(group_id):
+    if 'user_id' not in session: return redirect(url_for('auth_page'))
+    all_groups = session.get('ui_groups')
+    if not all_groups: return redirect(url_for('index'))
+    target_group = next((g for g in all_groups if g['id'] == group_id), None)
+    if not target_group:
+        flash(f"Group {group_id} not found.", "danger")
+        return redirect(url_for('index'))
+    return render_template('group_detail.html', group=target_group)
+
+
+@app.route('/get_envs')
+def get_envs():
+    # List top-level folders in the bucket
+    result = s3_handler.s3.list_objects(Bucket=s3_handler.bucket_name, Delimiter='/')
+    envs = [prefix.get('Prefix').strip('/') for prefix in result.get('CommonPrefixes', [])]
+    return jsonify(envs)
+
+@app.route('/get_versions/<env>')
+def get_versions(env):
+    # List folders under the selected env
+    prefix = f"{env}/"
+    result = s3_handler.s3.list_objects(Bucket=s3_handler.bucket_name, Prefix=prefix, Delimiter='/')
+    versions = [p.get('Prefix').replace(prefix, "").strip('/') for p in result.get('CommonPrefixes', [])]
+    return jsonify(versions)
+
+@app.route('/get_s3_files/<env>/<version>')
+def get_s3_files(env, version):
+    # List files under env/version/
+    prefix = f"{env}/{version}/"
+    result = s3_handler.s3.list_objects(Bucket=s3_handler.bucket_name, Prefix=prefix)
+    files = [obj.get('Key').replace(prefix, "") for obj in result.get('Contents', []) if obj.get('Key') != prefix]
+    return jsonify(files)
 
 @app.route('/download')
 def download():

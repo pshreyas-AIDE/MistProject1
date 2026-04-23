@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Group {{ group.id }} Details - Papi Analyzer</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background: #f0f2f5; font-family: 'Segoe UI', sans-serif; transition: all 0.3s ease; }
+        .sidebar { width: 280px; height: 100vh; position: fixed; background: #1c1e21; color: white; padding: 25px 20px; z-index: 100; display: flex; flex-direction: column; }
+        .main-content { margin-left: 280px; padding: 40px; }
+
+        .nav-link { color: #b0b3b8; padding: 12px; border-radius: 8px; margin-bottom: 8px; text-decoration: none; display: block; }
+        .nav-link:hover { background: rgba(255,255,255,0.1); color: white; }
+
+        .config-block { background: #ffffff; border-left: 5px solid #dee2e6; padding: 15px; margin-bottom: 15px; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .status-badge { font-size: 0.75rem; font-weight: bold; padding: 2px 8px; border-radius: 4px; }
+        .pending { color: #856404; background: #fff3cd; }
+        .analyzed { color: #6c757d; background: #e9ecef; }
+
+        /* MAC Module Styles */
+        .mac-section-card { border-radius: 12px; border: none; box-shadow: 0 4px 12px rgba(0,0,0,0.08); margin-bottom: 2rem; }
+        .mac-grid-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border: 1px solid #e9ecef;
+        }
+        .mac-badge {
+            background: white;
+            border: 1px solid #ced4da;
+            padding: 12px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.95rem;
+            font-weight: 700;
+            text-align: center;
+            color: #212529;
+            transition: all 0.2s;
+        }
+
+        .section-label { font-size: 0.8rem; font-weight: bold; color: #6c757d; text-transform: uppercase; letter-spacing: 0.5px; }
+        .custom-scrollbar::-webkit-scrollbar { width: 8px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f1f1; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 4px; }
+    </style>
+</head>
+<body>
+
+<div class="sidebar">
+    <h3 class="mb-4">📁 Papi Analyzer</h3>
+    <nav class="nav flex-column mb-5">
+        <a class="nav-link {% if view == 'dashboard' %}active{% endif %}" href="/">📊 EX Grouping Analyzer</a>
+        <a class="nav-link {% if view == 'search' %}active{% endif %}" href="/search_view">🔍 Pattern Search</a>
+    </nav>
+    <hr class="border-secondary mt-auto">
+    <div class="px-2">
+        <div class="small text-white mb-2">Logged in as: <strong>{{ session.get('user_name') }}</strong></div>
+        <a href="/logout" class="btn btn-outline-light btn-sm w-100"><i class="bi bi-box-arrow-right"></i> Logout</a>
+    </div>
+</div>
+
+<div class="main-content">
+
+    <div class="mb-4 pb-2">
+        <h1 class="fw-bold text-dark mb-2">Group {{ group.id }} Detailed View</h1>
+        <div class="d-flex align-items-center gap-3">
+            <a href="/" class="btn btn-sm btn-outline-secondary fw-bold rounded-pill px-4 shadow-sm" style="font-size: 0.85rem;">
+                <i class="bi bi-arrow-left me-1"></i> Back to Dashboard
+            </a>
+            <span class="badge bg-primary px-3 py-2" style="font-size: 0.85rem; border-radius: 6px;">
+                {{ group.macs|length }} Devices
+            </span>
+        </div>
+    </div>
+
+    <div class="card mac-section-card p-4">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <p class="section-label m-0">Device MAC List</p>
+            <button class="btn btn-sm btn-link text-primary fw-bold text-decoration-none" onclick="copyAllMacs()" id="copyBtn">
+                <i class="bi bi-clipboard me-1"></i> Copy All
+            </button>
+        </div>
+        <div class="mac-grid-container custom-scrollbar">
+            {% for mac in group.macs %}
+                <div class="mac-badge">{{ mac }}</div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card p-4 shadow-sm border-0 h-100" style="border-radius: 12px;">
+                <h6 class="text-primary fw-bold mb-4 text-uppercase" style="letter-spacing: 1px;"><i class="bi bi-plus-circle-fill me-2"></i>Added Configs</h6>
+                {% if group.added %}
+                    {% for c in group.added %}
+                        <div class="config-block" style="border-left-color: #0d6efd;">
+                            <div class="d-flex justify-content-between mb-2">
+                                <span class="small text-muted fw-bold">Subgroup {{c.sub}}</span>
+                                <span class="status-badge {% if 'Pending' in c.status %}pending{% else %}analyzed{% endif %}">{{c.status}}</span>
+                            </div>
+                            <div class="fw-bold" style="font-size: 0.9rem; color: #212529;">{{c.cmd}}</div>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <p class="text-muted small">No additions found.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card p-4 shadow-sm border-0 h-100" style="border-radius: 12px;">
+                <h6 class="text-danger fw-bold mb-4 text-uppercase" style="letter-spacing: 1px;"><i class="bi bi-dash-circle-fill me-2"></i>Removed Configs</h6>
+                {% if group.removed %}
+                    {% for c in group.removed %}
+                        <div class="config-block" style="border-left-color: #dc3545;">
+                            <div class="d-flex justify-content-between mb-2">
+                                <span class="small text-muted fw-bold">Subgroup {{c.sub}}</span>
+                                <span class="status-badge {% if 'Pending' in c.status %}pending{% else %}analyzed{% endif %}">{{c.status}}</span>
+                            </div>
+                            <div class="fw-bold" style="font-size: 0.9rem; color: #212529;">{{c.cmd}}</div>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <p class="text-muted small">No removals found.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    {% if group.added_errors or group.removed_errors %}
+    <div class="card p-4 shadow-sm border-0 mb-4" style="border-radius: 12px; border-left: 5px solid #dc3545;">
+        <div class="row">
+            {% if group.added_errors %}
+            <div class="col-md-6">
+                <h6 class="small fw-bold text-danger mb-2">Added Errors:</h6>
+                <ul class="small text-dark fw-bold">
+                    {% for e in group.added_errors %}<li>{{e}}</li>{% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+            {% if group.removed_errors %}
+            <div class="col-md-6">
+                <h6 class="small fw-bold text-danger mb-2">Removed Errors:</h6>
+                <ul class="small text-dark fw-bold">
+                    {% for e in group.removed_errors %}<li>{{e}}</li>{% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="card p-4 shadow-sm border-0 bg-white" style="border-radius: 12px; border-top: 4px solid #0d6efd !important;">
+        <p class="section-label mb-4">JIRA Operations</p>
+        <div class="row g-3">
+            <div class="col-md-4">
+                <button class="btn btn-primary w-100 fw-bold py-2" data-bs-toggle="modal" data-bs-target="#createJiraModal">
+                    <i class="bi bi-jira me-2"></i>Create Jira Ticket
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="createJiraModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content shadow-lg border-0" style="border-radius: 15px;">
+      <form action="/create_jira" method="post">
+        <div class="modal-header border-0 pb-0"><h5 class="modal-title fw-bold">Create Jira Ticket</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body">
+            <div class="mb-3"><label class="form-label small fw-bold text-muted">Summary</label><input type="text" name="summary" class="form-control" required></div>
+            <div class="mb-3"><label class="form-label small fw-bold text-muted">Description</label><textarea name="description" class="form-control" rows="4" required></textarea></div>
+            <div class="mb-3"><label class="form-label small fw-bold text-muted">Issue Type</label><select name="issue_type" class="form-select"><option value="Task">Task</option><option value="Bug">Bug</option></select></div>
+            <div class="mb-3"><label class="form-label small fw-bold text-muted">Labels</label><input type="text" name="labels" class="form-control"></div>
+        </div>
+        <div class="modal-footer border-0 pt-0"><button type="button" class="btn btn-light fw-bold" data-bs-dismiss="modal">Close</button><button type="submit" class="btn btn-primary fw-bold px-4">Save Ticket</button></div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    function copyAllMacs() {
+        const macString = "{{ group.macs|join(', ') }}";
+        navigator.clipboard.writeText(macString).then(() => {
+            const btn = document.getElementById('copyBtn');
+            btn.innerHTML = '<i class="bi bi-check2"></i> Copied!';
+            setTimeout(() => { btn.innerHTML = '<i class="bi bi-clipboard me-1"></i> Copy All'; }, 2000);
+        });
+    }
+</script>
+</body>
+</html>
