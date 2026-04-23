@@ -4,7 +4,14 @@ export postgresql_port=5432
 export postgresql_host=localhost
 export postgresql_schema=my_database
 
-export env_id=staging
+export env_id=euwe1prod3
 
 export s3_schema_name=shreyas
 export PYTHONPATH=/Users/pshreyas/PycharmProjects/MistProject1
+
+export jira_email_id=pshreyas@juniper.net
+export jira_token=ATATT3xFfGF0vFnJUAPUqbuFzG3Vgago6_vMjZcoU1kpwnGXU44vM3RHpx_iY7gqjDyhqzE3q_NtZz7F1qYBV15Oe8bO3vpHBrjkAfiVomZlCsFF0X-2377UiXLv7SFRZcw90JhtanYefg3TME_MqRGQObqPH_7-_ljDqPMMn0simpB1hBnkcaI=1F442532
+export jira_assigne=pshreyas@juniper.net
+
+export papi_internal_version=hotfix-v1.19.840-v1.19.880
+export papi_pilot_version=v1.20.297
