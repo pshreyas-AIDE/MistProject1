@@ -5,16 +5,7 @@ from library.https_call import HTTP_Calls
 import time
 import logging
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler("papi_run_error.log"), # Writes to a file
-        logging.StreamHandler()                  # Also shows in terminal
-    ]
-)
 
-logger = logging.getLogger(__name__)
 
 HEADERS = {
     'Content-Type': 'application/json',
@@ -22,6 +13,7 @@ HEADERS = {
 }
 
 result={}
+error_list=[]
 async def fetch_pair(client, mac_id,version,model, semaphore):
     async with semaphore:
         # We don't use gather() here to ensure we reuse the connection
@@ -35,7 +27,10 @@ async def fetch_pair(client, mac_id,version,model, semaphore):
             config_cmd1 = set(data1['ConfigCmd'])
             error1 = set(data1['_errors'])
         except:
-            logger.info(f"MAC Papi Internal: {mac_id} | Status: {resp1.status_code}")
+            if(resp1.status_code == 200):
+                error_list.append(["Papi_Internal",mac_id,"Status : 200",'ConfigCmd' in resp1.json(),"_errors" in resp1.json()])
+            else:
+                error_list.append(["Papi_Internal",mac_id,f"Status : {resp1.status_code}"])
             data1={}
             config_cmd1 = set()
             error1 = set()
@@ -50,7 +45,10 @@ async def fetch_pair(client, mac_id,version,model, semaphore):
             config_cmd2 = set(data2['ConfigCmd'])
             error2 = set(data2['_errors'])
         except:
-            logger.info(f"MAC Papi Pilot: {mac_id} | Status: {resp1.status_code}")
+            if(resp1.status_code == 200):
+                error_list.append(["Papi_Pilot",mac_id,f"Status : {resp1.status_code}",'ConfigCmd' in resp1.json(),"_errors" in resp1.json()])
+            else:
+                error_list.append(["Papi_Pilot",mac_id,f"Status : {resp1.status_code}"])
             data2={}
             config_cmd2 = set()
             error2 = set()
@@ -97,6 +95,10 @@ async def main(item_ids):
     # After the gather is complete:
     with open("api_results_final.json", "w") as f:
         json.dump(all_clean_results, f, indent=4)
+
+    with open("error_list.json", "w") as f:
+        for error in error_list:
+            f.write(json.dumps(error) + "\n")
 
 if __name__ == "__main__":
     start_time=time.perf_counter()
