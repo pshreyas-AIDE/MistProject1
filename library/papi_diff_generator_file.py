@@ -11,9 +11,8 @@ HEADERS = {
     'Content-Type': 'application/json',
     'Authorization': 'Bearer ' + "VgUb81zThTG9VKvAKjS8d6oqnmM2WMfIuEwp8VEQgdcELihOiMjHO9cBwBqiiwEuxTexZygCRXbOITggKh2NTjma3W9o8tBv"
 }
-
+error_file=open("error_list.json","w")
 result={}
-error_list=[]
 async def fetch_pair(client, mac_id,version,model, semaphore):
     async with semaphore:
         # We don't use gather() here to ensure we reuse the connection
@@ -22,16 +21,15 @@ async def fetch_pair(client, mac_id,version,model, semaphore):
         # Call 1
 
         try:
-            resp1 = await client.get(f"http://papi-internal-production.mist.pvt/internal/devices/{mac_id}/config_with_qs")
+            resp1 = await client.get(f"http://papi-internal-production.mist.pvt/internal/devices/{mac_id}/config_with_qs",follow_redirects=True,timeout=30.0)
             status_code=resp1.status_code
             data1 = resp1.json()
-            config_cmd1 = set(data1['ConfigCmd'])
-            error1 = set(data1['_errors'])
-        except:
-            if(resp1.status_code == 200):
-                error_list.append(["Papi_Internal",mac_id,"Status : 200",'ConfigCmd' in resp1.json(),"_errors" in resp1.json()])
-            else:
-                error_list.append(["Papi_Internal",mac_id,f"Status : {resp1.status_code}"])
+            if("ConfigCmd" in data1):
+                config_cmd1 = set(data1['ConfigCmd'])
+            if("_errors" in data1):
+                error1= set(data1['_errors'])
+        except Exception as e:
+            error_file.write("papi-internal"+str(mac_id)+str(e)+"\n")
             data1={}
             config_cmd1 = set()
             error1 = set()
@@ -40,16 +38,15 @@ async def fetch_pair(client, mac_id,version,model, semaphore):
 
         # Call 2 (Uses the same 'warm' connection automatically)
         try:
-            resp2 = await client.get(f"http://papi-pilot-production.mist.pvt/internal/devices/{mac_id}/config_with_qs")
+            resp2 = await client.get(f"http://papi-pilot-production.mist.pvt/internal/devices/{mac_id}/config_with_qs",follow_redirects=True,timeout=30.0)
             status_code = resp2.status_code
             data2 = resp2.json()
-            config_cmd2 = set(data2['ConfigCmd'])
-            error2 = set(data2['_errors'])
-        except:
-            if(resp2.status_code == 200):
-                error_list.append(["Papi_Pilot",mac_id,f"Status : {resp2.status_code}",'ConfigCmd' in resp2.json(),"_errors" in resp2.json()])
-            else:
-                error_list.append(["Papi_Pilot",mac_id,f"Status : {resp2.status_code}"])
+            if("ConfigCmd" in data2):
+                config_cmd2 = set(data2['ConfigCmd'])
+            if("_errors" in data2):
+                error2 = set(data2['_errors'])
+        except Exception as e:
+            error_file.write("Papi-pilot"+str(mac_id) + str(e) + "\n")
             data2={}
             config_cmd2 = set()
             error2 = set()
@@ -97,9 +94,6 @@ async def main(item_ids):
     with open("api_results_final.json", "w") as f:
         json.dump(all_clean_results, f, indent=4)
 
-    with open("error_list.json", "w") as f:
-        for error in error_list:
-            f.write(json.dumps(error) + "\n")
 
 if __name__ == "__main__":
     start_time=time.perf_counter()
