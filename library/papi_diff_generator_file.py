@@ -26,8 +26,12 @@ async def fetch_pair(client, mac_id,version,model, semaphore):
             data1 = resp1.json()
             if("ConfigCmd" in data1):
                 config_cmd1 = set(data1['ConfigCmd'])
+            else:
+                config_cmd1 = set()
             if("_errors" in data1):
                 error1= set(data1['_errors'])
+            else:
+                error1 = set()
         except Exception as e:
             error_file.write("papi-internal"+str(mac_id)+str(e)+"\n")
             data1={}
@@ -43,8 +47,12 @@ async def fetch_pair(client, mac_id,version,model, semaphore):
             data2 = resp2.json()
             if("ConfigCmd" in data2):
                 config_cmd2 = set(data2['ConfigCmd'])
+            else:
+                config_cmd2 = set()
             if("_errors" in data2):
                 error2 = set(data2['_errors'])
+            else:
+                error2 = set()
         except Exception as e:
             error_file.write("Papi-pilot"+str(mac_id) + str(e) + "\n")
             data2={}
