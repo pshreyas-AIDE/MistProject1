@@ -3,6 +3,18 @@ import httpx
 import json
 from library.https_call import HTTP_Calls
 import time
+import logging
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler("network_check.log"), # Writes to a file
+        logging.StreamHandler()                  # Also shows in terminal
+    ]
+)
+
+logger = logging.getLogger(__name__)
 
 HEADERS = {
     'Content-Type': 'application/json',
@@ -23,6 +35,7 @@ async def fetch_pair(client, mac_id,version,model, semaphore):
             config_cmd1 = set(data1['ConfigCmd'])
             error1 = set(data1['_errors'])
         except:
+            logger.info(f"MAC Papi Internal: {mac_id} | Status: {resp1.status_code}")
             data1={}
             config_cmd1 = set()
             error1 = set()
@@ -37,6 +50,7 @@ async def fetch_pair(client, mac_id,version,model, semaphore):
             config_cmd2 = set(data2['ConfigCmd'])
             error2 = set(data2['_errors'])
         except:
+            logger.info(f"MAC Papi Pilot: {mac_id} | Status: {resp1.status_code}")
             data2={}
             config_cmd2 = set()
             error2 = set()
