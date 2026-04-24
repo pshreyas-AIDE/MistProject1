@@ -9,7 +9,7 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler("network_check.log"), # Writes to a file
+        logging.FileHandler("papi_run_error.log"), # Writes to a file
         logging.StreamHandler()                  # Also shows in terminal
     ]
 )
