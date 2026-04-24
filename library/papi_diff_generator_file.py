@@ -20,6 +20,7 @@ async def fetch_pair(client, mac_id,version,model, semaphore):
         # and stay within rate limits more easily.
 
         # Call 1
+
         try:
             resp1 = await client.get(f"http://papi-internal-production.mist.pvt/internal/devices/{mac_id}/config_with_qs")
             status_code=resp1.status_code
@@ -45,10 +46,10 @@ async def fetch_pair(client, mac_id,version,model, semaphore):
             config_cmd2 = set(data2['ConfigCmd'])
             error2 = set(data2['_errors'])
         except:
-            if(resp1.status_code == 200):
-                error_list.append(["Papi_Pilot",mac_id,f"Status : {resp1.status_code}",'ConfigCmd' in resp1.json(),"_errors" in resp1.json()])
+            if(resp2.status_code == 200):
+                error_list.append(["Papi_Pilot",mac_id,f"Status : {resp2.status_code}",'ConfigCmd' in resp2.json(),"_errors" in resp2.json()])
             else:
-                error_list.append(["Papi_Pilot",mac_id,f"Status : {resp1.status_code}"])
+                error_list.append(["Papi_Pilot",mac_id,f"Status : {resp2.status_code}"])
             data2={}
             config_cmd2 = set()
             error2 = set()
