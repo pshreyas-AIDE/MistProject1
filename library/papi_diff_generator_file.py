@@ -52,7 +52,6 @@ async def fetch_pair(client, mac_id,version,model, semaphore):
                 "removed_configs":list(diff_removed),
                 "added_error":list(error_added),
             "removed_error":list(error_removed),
-            "org_id":data1['OrgID'],
                     "version":version,
                     "model":model
             }
