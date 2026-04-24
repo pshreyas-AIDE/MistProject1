@@ -36,16 +36,16 @@ class TokenDatabase(Base):
 class Build_Splice_tree:
 
     def __init__(self, payload):
-        list_of_sentences = []
+        self.list_of_sentences = []
         for i in payload:
             mac = payload[i]["mac"]
             l = []
             obj = nested_dict_to_list()
             obj.__iter__(payload[i], l)
-            list_of_sentences.extend(obj.list)
+            self.list_of_sentences.extend(obj.list)
         self.create_postgresql_database()
         self.create_s3_storage()
-        self.node = self.build_sentence_tree(list_of_sentences)
+        self.node = self.build_sentence_tree(self.list_of_sentences)
         self.get_branch_first_parent()
 
         self.token_to_node_storage={}    # Key=token_id and value=Node associated with the storage
@@ -381,14 +381,25 @@ class Build_Splice_tree:
         return top_10_percent
 
     def get_template(self):
+        all_original_sentences = {}
+        for sentence in self.list_of_sentences:
+            new_sent=[]
+            for word in sentence:
+                new_sent.append(str(word))
+            all_original_sentences[" ".join(new_sent)]=1
+
+
+
         result = {}
         def recursion(sentence,index,l):
             if(index>=len(sentence)):
-                if(sentence not in result):
-                    result[sentence]=[l.copy()]
-                else:
-                    result[sentence].append(l.copy())
-                # print(l)
+                formed_sentence=' '.join(l[1:])
+                if(formed_sentence in all_original_sentences):
+                    if (sentence not in result):
+                        result[sentence] = [l.copy()]
+                    else:
+                        result[sentence].append(l.copy())
+                    print(l)
                 return
 
             s3_file_path=os.environ.get("env_id") + "/token_to_word_mapping/" + sentence[index] + ".jsonl"
@@ -491,42 +502,42 @@ class Build_Splice_tree:
             return dict1
 
 
-        # Get max sentences for genralized sentence list
-        max_number_of_template=0
-        for sentence in self.generalized_sentences_list:
-            max_number_of_template=max(max_number_of_template,len(self.generalized_sentences_list[sentence]))
-
-        list_of_templated=[]
-        for i in range(max_number_of_template):
-            l=[]
-            for sentence in self.generalized_sentences_list:
-                ind=i%len(self.generalized_sentences_list[sentence])
-                l.append(self.generalized_sentences_list[sentence][ind])
-            list_of_templated.append(l.copy())
-
-        for i in list_of_templated:
-            res={}
-            for j in i:
-                f.write(str(j)+"\n")
-                res = deep_merge(res, nest_sentence(j))
-            f.write("\n" + str(res) + "\n")
-            f.write("\n\n\n")
-
-        # result={}
-        # l={}
+        # # Get max sentences for genralized sentence list
+        # max_number_of_template=0
         # for sentence in self.generalized_sentences_list:
-        #     for i in range(len(self.generalized_sentences_list[sentence])):
-        #         if(i not in l):
-        #             l[i]=[self.generalized_sentences_list[sentence][i]]
-        #         else:
-        #             l[i].append(self.generalized_sentences_list[sentence][i])
+        #     max_number_of_template=max(max_number_of_template,len(self.generalized_sentences_list[sentence]))
         #
-        # for i in l:
+        # list_of_templated=[]
+        # for i in range(max_number_of_template):
+        #     l=[]
+        #     for sentence in self.generalized_sentences_list:
+        #         ind=i%len(self.generalized_sentences_list[sentence])
+        #         l.append(self.generalized_sentences_list[sentence][ind])
+        #     list_of_templated.append(l.copy())
+        #
+        # for i in list_of_templated:
         #     res={}
-        #     for sentence in l[i]:
-        #         result=deep_merge(result,nest_sentence(sentence))
-        # f.write("\n"+str(result)+"\n")
-        # pass# Replace words with meaningful
+        #     for j in i:
+        #         f.write(str(j)+"\n")
+        #         res = deep_merge(res, nest_sentence(j))
+        #     f.write("\n" + str(res) + "\n")
+        #     f.write("\n\n\n")
+
+        result={}
+        l={}
+        for sentence in self.generalized_sentences_list:
+            for i in range(len(self.generalized_sentences_list[sentence])):
+                if(i not in l):
+                    l[i]=[self.generalized_sentences_list[sentence][i]]
+                else:
+                    l[i].append(self.generalized_sentences_list[sentence][i])
+
+        for i in l:
+            res={}
+            for sentence in l[i]:
+                result=deep_merge(result,nest_sentence(sentence))
+        f.write("\n"+str(result)+"\n")
+        pass# Replace words with meaningful
 
 
 class nested_dict_to_list:
