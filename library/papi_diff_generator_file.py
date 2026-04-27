@@ -108,7 +108,7 @@ async def main(item_ids):
 if __name__ == "__main__":
     start_time=time.perf_counter()
     mac_list = []
-    obj = HTTP_Calls("VgUb81zThTG9VKvAKjS8d6oqnmM2WMfIuEwp8VEQgdcELihOiMjHO9cBwBqiiwEuxTexZygCRXbOITggKh2NTjma3W9o8tBv")
+    obj = HTTP_Calls(os.environ['env_api_token'])
 
     results = []
     res = obj.get_call(f"http://papi-internal-{os.environ['env_id']}.mist.pvt/search/switches?type=switch&limit=10000")
