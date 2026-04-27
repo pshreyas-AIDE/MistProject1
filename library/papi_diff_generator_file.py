@@ -34,6 +34,8 @@ async def fetch_pair(client, mac_id,version,model, semaphore):
                 error1= set(data1['_errors'])
             else:
                 error1 = set()
+            if(status_code!=200):
+                error_file.write("papi-internal"+str(mac_id)+" Status code : "+str(status_code)+"\n")
         except Exception as e:
             error_file.write("papi-internal"+str(mac_id)+str(e)+"\n")
             data1={}
@@ -55,6 +57,8 @@ async def fetch_pair(client, mac_id,version,model, semaphore):
                 error2 = set(data2['_errors'])
             else:
                 error2 = set()
+            if (status_code != 200):
+                error_file.write("papi-pilot" + str(mac_id) + " Status code : " + str(status_code) + "\n")
         except Exception as e:
             error_file.write("Papi-pilot"+str(mac_id) + str(e) + "\n")
             data2={}
