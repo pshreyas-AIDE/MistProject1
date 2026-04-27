@@ -5,6 +5,7 @@ export postgresql_host=localhost
 export postgresql_schema=my_database
 
 export env_id=euwe1prod3
+export env_api_token=VgUb81zThTG9VKvAKjS8d6oqnmM2WMfIuEwp8VEQgdcELihOiMjHO9cBwBqiiwEuxTexZygCRXbOITggKh2NTjma3W9o8tBv
 
 export s3_schema_name=shreyas
 export PYTHONPATH=/Users/pshreyas/PycharmProjects/MistProject1
@@ -15,3 +16,4 @@ export jira_assigne=pshreyas@juniper.net
 
 export papi_internal_version=hotfix-v1.19.840-v1.19.880
 export papi_pilot_version=v1.20.297
+

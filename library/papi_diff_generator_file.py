@@ -1,4 +1,6 @@
 import asyncio
+import os
+
 import httpx
 import json
 from library.https_call import HTTP_Calls
@@ -9,7 +11,7 @@ import logging
 
 HEADERS = {
     'Content-Type': 'application/json',
-    'Authorization': 'Bearer ' + "VgUb81zThTG9VKvAKjS8d6oqnmM2WMfIuEwp8VEQgdcELihOiMjHO9cBwBqiiwEuxTexZygCRXbOITggKh2NTjma3W9o8tBv"
+    'Authorization': 'Bearer ' + os.environ['env_api_token']
 }
 error_file=open("error_list.json","w")
 result={}
@@ -21,7 +23,7 @@ async def fetch_pair(client, mac_id,version,model, semaphore):
         # Call 1
 
         try:
-            resp1 = await client.get(f"http://papi-internal-production.mist.pvt/internal/devices/{mac_id}/config_with_qs",follow_redirects=True,timeout=30.0)
+            resp1 = await client.get(f"http://papi-internal-{os.environ['env_id']}.mist.pvt/internal/devices/{mac_id}/config_with_qs",follow_redirects=True,timeout=30.0)
             status_code=resp1.status_code
             data1 = resp1.json()
             if("ConfigCmd" in data1):
@@ -42,7 +44,7 @@ async def fetch_pair(client, mac_id,version,model, semaphore):
 
         # Call 2 (Uses the same 'warm' connection automatically)
         try:
-            resp2 = await client.get(f"http://papi-pilot-production.mist.pvt/internal/devices/{mac_id}/config_with_qs",follow_redirects=True,timeout=30.0)
+            resp2 = await client.get(f"http://papi-pilot-{os.environ['env_id']}.mist.pvt/internal/devices/{mac_id}/config_with_qs",follow_redirects=True,timeout=30.0)
             status_code = resp2.status_code
             data2 = resp2.json()
             if("ConfigCmd" in data2):
@@ -109,7 +111,7 @@ if __name__ == "__main__":
     obj = HTTP_Calls("VgUb81zThTG9VKvAKjS8d6oqnmM2WMfIuEwp8VEQgdcELihOiMjHO9cBwBqiiwEuxTexZygCRXbOITggKh2NTjma3W9o8tBv")
 
     results = []
-    res = obj.get_call("http://papi-internal-production.mist.pvt/search/switches?type=switch&limit=10000")
+    res = obj.get_call(f"http://papi-internal-{os.environ['env_id']}.mist.pvt/search/switches?type=switch&limit=10000")
     results += res["results"]
 
     while "next" in res.keys():
