@@ -1,6 +1,7 @@
 from jira import JIRA
 import os
-
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 class JiraToolkit:
     def __init__(self, server_url, email, api_token):
         # Initializing connection with a 60-second timeout to handle Zscaler lag
@@ -15,9 +16,11 @@ class JiraToolkit:
 
     # --- READ OPERATIONS ---
 
-    def search_by_keyword(self, project_key, keyword,days=30):
+    def search_by_keyword(self, project_key, keyword):
         """Search issues in a project containing a specific text string."""
-        jql = f'created >= -{days}d AND textfields ~ "{keyword}" ORDER BY created DESC'
+        jql = f'textfields ~ "{keyword}" ORDER BY created DESC'
+        #jql = f'project = "{project_key}" AND text ~ "{keyword}" ORDER BY created DESC'
+        #jql = f'project = "{project_key}" AND summary ~ "{keyword}"'
         print(jql)
         return self.jira.search_issues(jql)
 
@@ -64,7 +67,12 @@ class JiraToolkit:
 
 
 
-jt = JiraToolkit("https://mistsys.atlassian.net/", "pshreyas@juniper.net", "ATATT3xFfGF0vFnJUAPUqbuFzG3Vgago6_vMjZcoU1kpwnGXU44vM3RHpx_iY7gqjDyhqzE3q_NtZz7F1qYBV15Oe8bO3vpHBrjkAfiVomZlCsFF0X-2377UiXLv7SFRZcw90JhtanYefg3TME_MqRGQObqPH_7-_ljDqPMMn0simpB1hBnkcaI=1F442532")
+# jt = JiraToolkit("https://mistsys.atlassian.net/", "pshreyas@juniper.net", "")
+# res=jt.search_by_keyword("MIST","cpu")
+# print(res)
+# for i in res:
+#     print(i)
+jt = JiraToolkit("https://mistsys.atlassian.net/", "pshreyas@juniper.net", "")
 res=jt.search_by_keyword("MIST","cpu")
 for i in res:
     print(i)

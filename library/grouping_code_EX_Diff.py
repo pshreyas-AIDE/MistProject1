@@ -216,7 +216,10 @@ class Diff_Analyzer:
                     related_jira.extend(jiras.keys())
             except:
                 pass
-        return related_jira
+        final_jiras=[]
+        for jira in related_jira:
+            final_jiras.append(str(jira))
+        return final_jiras
 
     def get_create_jira_contents(self,mac_payload,mac_id):
 
@@ -242,6 +245,18 @@ class Diff_Analyzer:
         description=step1+step2+step3+step4+step5+step6
 
         return [type,assigne,title,description]
+
+    def get_all_related_jiras_for_papi_pilot_version(self):
+        env=os.environ.get("env_id")
+        papi_pilot=f"Papi Pilot Version = {os.environ.get("papi_pilot_version")}"
+        papi_internal=f"Papi internal Version = {os.environ.get("papi_internal_version")}"
+        title = f"[Papi Diff - {papi_pilot}  {papi_internal}] "
+        issues = self.jira_obj.search_by_keyword("MIST",title)
+        final=[]
+        for i in issues:
+            final.append(str(i))
+        return final
+
     def analyze_diff(self,file_name):
 
         mac_wise_commands_added = {}
@@ -465,7 +480,7 @@ class Diff_Analyzer:
             f.write(f"Assigne : {jira_creation_data[1]}\n")
             f.write(f"Title : {jira_creation_data[2]}\n")
             f.write(f"Description : \n{jira_creation_data[3]}\n\n")
-
+            f.write(f"Already Created Jiras :\n{",".join(self.get_all_related_jiras_for_papi_pilot_version())}\n\n\n")
             f.write("$$"*30)
 
             group_count += 1
@@ -513,6 +528,6 @@ class Diff_Analyzer:
 
 
 obj=Diff_Analyzer()
-file_name=os.environ['env_id']+"/"+os.environ['papi_pilot_version']+"|"+os.environ['papi_internal_version']+"/papi_config_compare_data_switch_euwe1prod3.json"
+file_name=os.environ['env_id']+"/"+os.environ['papi_pilot_version']+"|"+os.environ['papi_internal_version']+f"/papi_config_compare_data_switch_{os.environ['env_id']}.json"
 
 res=obj.analyze_diff(file_name=file_name)
