@@ -3,6 +3,7 @@ from botocore.exceptions import ClientError # Specific error related to S3 opera
 from botocore.config import Config
 import json
 from collections import defaultdict
+import os
 
 # Create a "Heavy Duty" configuration
 heavy_duty_config = Config(
@@ -67,6 +68,46 @@ class S3StorageManager:
             return True
         except ClientError as e:
             print(f"Error uploading to S3: {e}")
+            return False
+
+    def update_percentage(self, key, percentage):
+        """
+        Overwrites the S3 object with a single number.
+        """
+        try:
+            # We convert the number to a string to store it as the body
+            self.s3.put_object(
+                Bucket=self.bucket_name,
+                Key=key,
+                Body=str(percentage),
+                ContentType='text/plain'
+            )
+            return True
+        except ClientError as e:
+            print(f"Error: {e}")
+            return False
+
+    def upload_local_json(self, local_file_path, s3_key):
+        """
+        Reads a local JSON file and uploads it to a specific S3 path.
+
+        local_file_path: e.g., 'results.json' or 'data/clean_batch.json'
+        s3_key: The destination path in S3, e.g., 'backups/today/results.json'
+        """
+        try:
+            # Check if file exists locally before trying to upload
+            if not os.path.exists(local_file_path):
+                print(f"Error: Local file {local_file_path} not found.")
+                return False
+
+            # Use upload_file for better performance and reliability
+            self.s3.upload_file(local_file_path, self.bucket_name, s3_key)
+
+            print(f"Successfully uploaded {local_file_path} to s3://{self.bucket_name}/{s3_key}")
+            return True
+
+        except ClientError as e:
+            print(f"S3 Upload Error: {e}")
             return False
 
     def get_data(self, key):

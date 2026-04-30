@@ -5,7 +5,10 @@ from library.jira_integrator import *
 from library.s3_library import *
 import difflib
 
-
+# s3 Object creation to write diffs
+schema_name = os.environ.get("s3_schema_name")
+# path global for the papi diff run
+path_of_s3_file = f"{schema_name}/{os.environ['env_id']}/{os.environ['papi_internal_version']}|{os.environ['papi_pilot_version']}"
 
 def grouping(commands,mac_wise_commands):
     # parent_child ->      key ( parent_word, child_word ) Value = Middle    eg :   set vlans vlan_id 10    ----> { (set,vlan_id) : vlans }
@@ -523,11 +526,40 @@ class Diff_Analyzer:
         analyzed_result["removed_commands_per_group"]=removed_commands_per_group # Key Group A1 , Value - List of all commands in group eg { A1 : ['set interfaces interface-range default member mge-1/0/40', 'set interfaces interface-range default member mge-1/0/42', 'set interfaces interface-range default member mge-1/0/45', 'set interfaces interface-range default member mge-1/0/[26-32] ]
         analyzed_result["mac_wise_commands_added"]=mac_wise_commands_added # key Command , Value - List of macs which have these commands eg set interfaces interface-range default member mge-1/0/40 ['408f9dc8e256', '68f38efbd468', '04698ffaeba8', '4c734f490b28', '0c8126b712a2', 'ec94d5dc93a0']
         analyzed_result["mac_wise_commands_removed"]=mac_wise_commands_removed # key Command , Value - List of macs which have these commands eg set interfaces interface-range default member mge-1/0/40 ['408f9dc8e256', '68f38efbd468', '04698ffaeba8', '4c734f490b28', '0c8126b712a2', 'ec94d5dc93a0']
+
+
+        consolidated_analysis_s3_path=f"{path_of_s3_file}/Consolidated_analysis_file"
+        self.s3_object.upload_local_json("Consolidated_analysis_file",consolidated_analysis_s3_path)
+
+        error_added_s3_path=f"{path_of_s3_file}/newly_added_error"
+        self.s3_object.upload_local_json("newly_added_error", error_added_s3_path)
+
+        error_added_s3_path = f"{path_of_s3_file}/newly_removed_error"
+        self.s3_object.upload_local_json("newly_removed_error", error_added_s3_path)
+
         return analyzed_result
 
 
 
-obj=Diff_Analyzer()
-file_name=os.environ['env_id']+"/"+os.environ['papi_pilot_version']+"|"+os.environ['papi_internal_version']+f"/papi_config_compare_data_switch_{os.environ['env_id']}.json"
 
-res=obj.analyze_diff(file_name=file_name)
+
+
+
+
+
+# obj=Diff_Analyzer()
+# file_name=os.environ['env_id']+"/"+os.environ['papi_pilot_version']+"|"+os.environ['papi_internal_version']+f"/papi_config_compare_data_switch_{os.environ['env_id']}.json"
+#
+# res=obj.analyze_diff(file_name=file_name)
+
+
+
+
+class papi_diff_analysis_and_grouping:
+    def __init__(self):
+
+
+        obj=Diff_Analyzer()
+        file_name=path_of_s3_file+f"/papi_config_compare_data_switch_{os.environ['env_id']}.json"
+
+        res=obj.analyze_diff(file_name=file_name)
