@@ -168,7 +168,7 @@ async def main(item_ids):
         papi_diff_file_final_contets[mac_id]=i
 
     papi_diff_final_s3_path = f"{path_of_s3_file}/papi_config_compare_data_switch_{os.environ['env_id']}.json"
-    s3_object.update_percentage(papi_diff_final_s3_path, papi_diff_file_final_contets)
+    s3_object.upload_data(papi_diff_final_s3_path, papi_diff_file_final_contets)
 
 
 # if __name__ == "__main__":
@@ -240,5 +240,5 @@ class papi_diff_generator_for_env:
         mac_list_file.write(f"Processed {len(mac_list)} items in {total_time:.2f} seconds.\n\n{str(mac_list)}")
 
 
-
+obj=papi_diff_generator_for_env()
 

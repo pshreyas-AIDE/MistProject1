@@ -72,9 +72,9 @@ class JiraToolkit:
 # print(res)
 # for i in res:
 #     print(i)
-jt = JiraToolkit("https://mistsys.atlassian.net/", "pshreyas@juniper.net", "")
-res=jt.search_by_keyword("MIST","cpu")
-for i in res:
-    print(i)
+# jt = JiraToolkit("https://mistsys.atlassian.net/", "pshreyas@juniper.net", "")
+# res=jt.search_by_keyword("MIST","cpu")
+# for i in res:
+#     print(i)
 #res=jt.get_comments("MIST-182565")
 

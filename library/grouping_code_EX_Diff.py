@@ -4,6 +4,7 @@ import json
 from library.jira_integrator import *
 from library.s3_library import *
 import difflib
+import time
 
 # s3 Object creation to write diffs
 schema_name = os.environ.get("s3_schema_name")
@@ -282,7 +283,7 @@ class Diff_Analyzer:
         error_list_added = []
         error_list_removed = []
 
-        # Opening the Papi Diff Jspm file and parsing it into Dictionary object
+        # # Opening the Papi Diff Jspm file and parsing it into Dictionary object
         # with open(file_name) as json_file:
         #     payload = json.load(json_file)
         payload=self.s3_object.get_data(file_name)
@@ -528,6 +529,8 @@ class Diff_Analyzer:
         analyzed_result["mac_wise_commands_removed"]=mac_wise_commands_removed # key Command , Value - List of macs which have these commands eg set interfaces interface-range default member mge-1/0/40 ['408f9dc8e256', '68f38efbd468', '04698ffaeba8', '4c734f490b28', '0c8126b712a2', 'ec94d5dc93a0']
 
 
+        f.close()
+
         consolidated_analysis_s3_path=f"{path_of_s3_file}/Consolidated_analysis_file"
         self.s3_object.upload_local_json("Consolidated_analysis_file",consolidated_analysis_s3_path)
 
@@ -538,13 +541,6 @@ class Diff_Analyzer:
         self.s3_object.upload_local_json("newly_removed_error", error_added_s3_path)
 
         return analyzed_result
-
-
-
-
-
-
-
 
 
 # obj=Diff_Analyzer()
@@ -562,4 +558,7 @@ class papi_diff_analysis_and_grouping:
         obj=Diff_Analyzer()
         file_name=path_of_s3_file+f"/papi_config_compare_data_switch_{os.environ['env_id']}.json"
 
+
         res=obj.analyze_diff(file_name=file_name)
+
+obj=papi_diff_analysis_and_grouping()

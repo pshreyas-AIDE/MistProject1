@@ -4,8 +4,8 @@ export postgresql_port=5432
 export postgresql_host=localhost
 export postgresql_schema=my_database
 
-export env_id=euwe1prod3
-export env_api_token=VgUb81zThTG9VKvAKjS8d6oqnmM2WMfIuEwp8VEQgdcELihOiMjHO9cBwBqiiwEuxTexZygCRXbOITggKh2NTjma3W9o8tBv
+export env_id=nane1prod1
+export env_api_token=hqENVdHIVT0kBfKlGvpsbS3IXOUqFFgERM0PitwNUyBFG4ugQQW0PnFSZC6Z5euFiHbkCKxeDnf2BhK0aUbhf9E4vA714Caa
 
 export s3_schema_name=shreyas
 export PYTHONPATH=/Users/pshreyas/PycharmProjects/MistProject1
@@ -14,6 +14,6 @@ export jira_email_id=pshreyas@juniper.net
 export jira_token=
 export jira_assigne=pshreyas@juniper.net
 
-export papi_internal_version=hotfix-v1.19.840-v1.19.880
-export papi_pilot_version=v1.20.297
+export papi_internal_version=hotfix-v1.20.400-v1.20.433
+export papi_pilot_version=v1.20.560
 
