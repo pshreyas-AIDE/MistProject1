@@ -9,6 +9,8 @@ from library.postgresql import *
 import os
 import math
 
+from library.https_call import HTTP_Calls
+
 empty_parent_or_empty_child_hash_value="@#$%^&*(Empty Empty Empty)*"
 f=open("new.json","w")
 # use Cosine similarity to find top 10% of words which are similar - Import library as below
@@ -3095,3 +3097,44 @@ Build_Splice_tree(payload)
 # # To LOAD the tree later
 # with open('device_tree.pkl', 'rb') as f:
 #     loaded_tree = pickle.load(f)
+
+
+
+
+# Get the configs per env
+class config_accumulator:
+    def __init__(self):
+        mac_list = []
+        obj = HTTP_Calls(os.environ['env_api_token'])
+
+        results = []
+        res = obj.get_call(f"http://papi-internal-{os.environ['env_id']}.mist.pvt/search/switches?type=switch&limit=10000")
+        results += res["results"]
+
+        while "next" in res.keys():
+            all_search_url = res["next"]
+            res = obj.get_call(all_search_url)
+            results += res["results"]
+
+        for item in results:
+            mac_id=None
+            version=None
+            model=None
+            if("mac" in item):
+                mac_id=item["mac"]
+            if("version" in item):
+                version=item["version"]
+            if("model" in item):
+                model=item["model"]
+            mac_list.append((mac_id, version,model))
+
+
+        # Call internal api for macs
+        for mac_id in mac_list:
+            try:
+                device_config=obj.get_call(f"http://papi-internal-{os.environ['env_id']}.mist.pvt/internal/devices/{mac_id}/config_with_qs")
+
+            except:
+                print(f"Mac Id {mac_id} failed to get configs")
+
+
