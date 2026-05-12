@@ -8,7 +8,7 @@ from library.s3_library import S3StorageManager
 from library.postgresql import *
 import time
 import logging
-
+import subprocess
 
 
 # s3 Object creation to write diffs
@@ -29,6 +29,41 @@ HEADERS = {
 error_file=open("error_list.json","w")
 mac_list_file=open("mac_list.json","w")
 result={}
+
+
+def check_port_exhaustion(threshold=0.8, wait_time=120):
+    """
+    Checks if TCP port usage is above the threshold (default 80%).
+    If so, sleeps for wait_time (default 2 mins).
+    """
+    # 1. Get the total range size (macOS specific)
+    # Typically 49152 to 65535 on Mac = 16,383 ports
+    try:
+        first = int(subprocess.check_output(["sysctl", "-n", "net.inet.ip.portrange.first"]).decode())
+        last = int(subprocess.check_output(["sysctl", "-n", "net.inet.ip.portrange.last"]).decode())
+        total_allowed = last - first
+    except Exception:
+        total_allowed = 16383  # Fallback for standard macOS config
+
+    # 2. Count current TCP connections (Established and Time_Wait)
+    # We use netstat -an and count lines containing 'tcp'
+    try:
+        current_usage = int(subprocess.check_output("netstat -an | grep -c 'tcp'", shell=True).decode())
+    except subprocess.CalledProcessError:
+        current_usage = 0
+
+    usage_percent = current_usage / total_allowed
+    print(f"Current Port Usage: {current_usage}/{total_allowed} ({usage_percent:.1%})")
+
+    # 3. Logic: If 80% or more, wait
+    if usage_percent >= threshold:
+        print(f"⚠️ PORT EXHAUSTION RISK! {usage_percent:.1%} used. Waiting {wait_time}s for ports to clear...")
+        time.sleep(wait_time)
+        return True
+
+    return False
+
+
 async def fetch_pair(client, mac_id,version,model, semaphore):
     async with semaphore:
         # We don't use gather() here to ensure we reuse the connection
@@ -105,8 +140,8 @@ async def fetch_pair(client, mac_id,version,model, semaphore):
         error_removed=error2 - error1
         if(len(diff_removed)!=0 or len(diff_added)!=0):
             return {"mac":mac_id,
-                "added_configs":list(diff_added),
-                "removed_configs":list(diff_removed),
+                "added_config":list(diff_added),
+                "removed_config":list(diff_removed),
                 "added_error":list(error_added),
             "removed_error":list(error_removed),
                     "version":version,
@@ -136,6 +171,7 @@ async def main(item_ids):
             clean_batch = [r for r in batch_results if r is not None]
             all_clean_results.extend(clean_batch)
 
+            check_port_exhaustion()
             # Save incremental progress to a file
             # with open(f"results_batch_{i // batch_size}.json", "w") as f:
             #     json.dump(clean_batch, f, indent=4)
@@ -168,7 +204,7 @@ async def main(item_ids):
         papi_diff_file_final_contets[mac_id]=i
 
     papi_diff_final_s3_path = f"{path_of_s3_file}/papi_config_compare_data_switch_{os.environ['env_id']}.json"
-    s3_object.upload_data(papi_diff_final_s3_path, papi_diff_file_final_contets)
+    s3_object.upload_data(papi_diff_final_s3_path, json.dumps(papi_diff_file_final_contets,indent=4))
 
 
 # if __name__ == "__main__":
@@ -239,6 +275,10 @@ class papi_diff_generator_for_env:
         print(f"Processed {len(mac_list)} items in {total_time:.2f} seconds.")
         mac_list_file.write(f"Processed {len(mac_list)} items in {total_time:.2f} seconds.\n\n{str(mac_list)}")
 
+        # After going through all files - Update percentage as 100 %
+        s3_path_percentage = f"{path_of_s3_file}/percentage_of_run.json"
+        percentage_of_run = 100
+        s3_object.update_percentage(s3_path_percentage, percentage_of_run)
 
 obj=papi_diff_generator_for_env()
 

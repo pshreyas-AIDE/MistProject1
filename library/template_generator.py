@@ -20,6 +20,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
 
 
+
 class SentenceNode:
     def __init__(self, word):
         self.word = word
@@ -3067,7 +3068,7 @@ payload = {
         "mist_configured": True
     }
 }
-Build_Splice_tree(payload)
+# Build_Splice_tree(payload)
 
 # list_of_sentences=[]
 # for i in payload:
@@ -3128,13 +3129,35 @@ class config_accumulator:
                 model=item["model"]
             mac_list.append((mac_id, version,model))
 
+        schema_name = os.environ.get("s3_schema_name")
+        s3_object = S3StorageManager(schema_name)
+        path_of_s3_file = f"{schema_name}/{os.environ['env_id']}/template_generation"
 
         # Call internal api for macs
-        for mac_id in mac_list:
+        for mac_id_tuple in mac_list:
+            mac_id=mac_id_tuple[0]
             try:
                 device_config=obj.get_call(f"http://papi-internal-{os.environ['env_id']}.mist.pvt/internal/devices/{mac_id}/config_with_qs")
+                device_info=obj.get_call(f"http://papi-internal-{os.environ['env_id']}.mist.pvt/internal/devices/{mac_id}")
+                model=device_info['model']
+                evpn_enabled_or_not='evpntopo_url' in device_info or "evpn_config" in device_info
+                evpn_role=None
+
+                if("evpn_config" in device_info):
+                    evpn_role=device_info['evpn_config']['role']
+
+
+
+                s3_url=f"{path_of_s3_file}/{model}"
+                if(evpn_enabled_or_not):
+                    s3_url=f"{s3_url}/evpn_enabled/{str(evpn_role)}"
+                s3_url=f"{s3_url}/config.json"
+                print(mac_id,evpn_enabled_or_not,evpn_role)
+                print(s3_url)
+                s3_object.upload_data(s3_url,json.dumps(device_config))
 
             except:
                 print(f"Mac Id {mac_id} failed to get configs")
 
 
+obj=config_accumulator()

@@ -4,8 +4,8 @@ export postgresql_port=5432
 export postgresql_host=localhost
 export postgresql_schema=my_database
 
-export env_id=nane1prod1
-export env_api_token=hqENVdHIVT0kBfKlGvpsbS3IXOUqFFgERM0PitwNUyBFG4ugQQW0PnFSZC6Z5euFiHbkCKxeDnf2BhK0aUbhf9E4vA714Caa
+export env_id=staging
+export env_api_token=qCPPOPhgFCgf3sCSj6GD4z7CofNwCO3SB1GHsNF6mDZ9tQlCvLUlmihtnfgKw3dJxntEUfBp9LiJbyQ9CCOjGpgkbpq2Hchi
 
 export s3_schema_name=shreyas
 export PYTHONPATH=/Users/pshreyas/PycharmProjects/MistProject1
