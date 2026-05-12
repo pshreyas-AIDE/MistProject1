@@ -67,8 +67,9 @@ class JiraToolkit:
 
 
 
-# jt = JiraToolkit("https://mistsys.atlassian.net/", "pshreyas@juniper.net", "")
-# res=jt.search_by_keyword("MIST","cpu")
+#jt = JiraToolkit("https://mistsys.atlassian.net/", "pshreyas@juniper.net", "")
+#jt.create_jira("MIST","Checking Jira creation","Checking Jira creation","Checking Jira creation")
+#res=jt.search_by_keyword("MIST","marvis")
 # print(res)
 # for i in res:
 #     print(i)

@@ -242,7 +242,7 @@ class Diff_Analyzer:
         step1=f'1. Versions\n{papi_pilot}\n{papi_internal}\n\n'
         step2=f'2. Envs\n{env}\n\n'
         step3=f'3. Sample diff\n{json.dumps(mac_payload, indent=4)}\n\n'
-        step4=f'4. Internal APIs :\npapi-pilot : http://papi-pilot-{env}.mist.pvt/internal/devices/{mac_id}/config_with_qs\npapi-pilot : http://papi-pilot-{env}.mist.pvt/internal/devices/{mac_id}/config_with_qs\n\n'
+        step4=f'4. Internal APIs :\npapi-pilot : http://papi-pilot-{env}.mist.pvt/internal/devices/{mac_id}/config_with_qs\npapi-internal : http://papi-internak-{env}.mist.pvt/internal/devices/{mac_id}/config_with_qs\n\n'
         step5=f'5. Related Jiras :\n{related_jira}\n\n'
         step6=f'6: Conclusion :\n\n\n'
 
