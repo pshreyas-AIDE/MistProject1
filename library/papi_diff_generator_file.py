@@ -57,7 +57,7 @@ def check_port_exhaustion(threshold=0.8, wait_time=120):
 
     # 3. Logic: If 80% or more, wait
     if usage_percent >= threshold:
-        print(f"⚠️ PORT EXHAUSTION RISK! {usage_percent:.1%} used. Waiting {wait_time}s for ports to clear...")
+        print(f"PORT EXHAUSTION RISK! {usage_percent:.1%} used. Waiting {wait_time}s for ports to clear...")
         time.sleep(wait_time)
         return True
 
