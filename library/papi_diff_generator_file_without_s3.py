@@ -11,13 +11,13 @@ import logging
 import subprocess
 
 
-# s3 Object creation to write diffs
-schema_name=os.environ.get("s3_schema_name")
-s3_object = S3StorageManager(schema_name)
-
-# path global for the papi diff run
-path_of_s3_file=f"{schema_name}/{os.environ['env_id']}/{os.environ['papi_internal_version']}|{os.environ['papi_pilot_version']}"
-
+# # s3 Object creation to write diffs
+# schema_name=os.environ.get("s3_schema_name")
+# s3_object = S3StorageManager(schema_name)
+#
+# # path global for the papi diff run
+# path_of_s3_file=f"{schema_name}/{os.environ['env_id']}/{os.environ['papi_internal_version']}|{os.environ['papi_pilot_version']}"
+#
 
 
 

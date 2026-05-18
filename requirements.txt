@@ -1,2 +1,6 @@
 asyncio
-httpx==0.28.1
+httpx
+urllib3
+requests
+boto3
+sqlalchemy
