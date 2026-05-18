@@ -63,6 +63,45 @@ def check_port_exhaustion(threshold=0.8, wait_time=120):
 
     return False
 
+def check_port_exhaustion_linux(threshold=0.8, wait_time=120):
+    """
+    Linux-optimized check for ephemeral TCP port exhaustion.
+    Reads directly from /proc filesystem to maximize speed and minimize resource footprint.
+    """
+    # 1. Get the exact Ephemeral Port Pool Size configured on the host
+    try:
+        with open('/proc/sys/net/ipv4/ip_local_port_range', 'r') as f:
+            parts = f.read().split()
+            first, last = int(parts[0]), int(parts[1])
+            total_allowed = last - first + 1
+    except Exception:
+        # Fallback to the default Linux kernel range if file reading fails
+        total_allowed = 28232  # (32768 to 60999)
+
+    # 2. Count active TCP sockets from the kernel space
+    # This reads the live TCP connection table instantly
+    try:
+        with open('/proc/net/tcp', 'r') as f:
+            # Read lines and subtract 1 for the header row
+            current_usage = len(f.readlines()) - 1
+    except Exception:
+        current_usage = 0
+
+    # Prevent potential ZeroDivisionError
+    if total_allowed <= 0:
+        total_allowed = 28232
+
+    usage_percent = current_usage / total_allowed
+    print(f"Current Linux Port Usage: {current_usage}/{total_allowed} ({usage_percent:.1%})")
+
+    # 3. Defensive safeguard logic
+    if usage_percent >= threshold:
+        print(f"PORT EXHAUSTION RISK! {usage_percent:.1%} used on runner. Waiting {wait_time}s to clear...")
+        time.sleep(wait_time)
+        return True
+
+    return False
+
 
 async def fetch_pair(client, mac_id,version,model, semaphore):
     async with semaphore:
@@ -171,7 +210,7 @@ async def main(item_ids):
             clean_batch = [r for r in batch_results if r is not None]
             all_clean_results.extend(clean_batch)
 
-            check_port_exhaustion()
+            check_port_exhaustion_linux()
             # Save incremental progress to a file
             with open(f"results_batch_{i // batch_size}.json", "w") as f:
                 json.dump(clean_batch, f, indent=4)
