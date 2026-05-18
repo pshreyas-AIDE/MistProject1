@@ -305,18 +305,22 @@ class Diff_Analyzer:
             # print(mac,payload[mac])
             if ('added_config' in payload[mac]):
                 for added in payload[mac]['added_config']:
-                    if (added not in mac_wise_commands_added):
-                        mac_wise_commands_added[added] = [mac]
+                    # Replace the String inside set command by constant string since this is very variable and will lead to 1000s of new groups
+                    # eg : set groups top system login message \"*******************************************************************\\n*                                                                 *\\n*  WARNING:\""
+                    refined_added = re.sub(r'"[^"]*"', '"$$$$$$$$$$User_Input_Variable_String$$$$$$$$$$"', added)
+                    if (refined_added not in mac_wise_commands_added):
+                        mac_wise_commands_added[refined_added] = [mac]
                     else:
-                        mac_wise_commands_added[added].append(mac)
-                    diff_list_added.append(added)
+                        mac_wise_commands_added[refined_added].append(mac)
+                    diff_list_added.append(refined_added)
             if ('removed_config' in payload[mac]):
                 for added in payload[mac]['removed_config']:
-                    if (added not in mac_wise_commands_removed):
-                        mac_wise_commands_removed[added] = [mac]
+                    refined_added = re.sub(r'"[^"]*"', '"$$$$$$$$$$User_Input_Variable_String$$$$$$$$$$"', added)
+                    if (refined_added not in mac_wise_commands_removed):
+                        mac_wise_commands_removed[refined_added] = [mac]
                     else:
-                        mac_wise_commands_removed[added].append(mac)
-                    diff_list_removed.append(added)
+                        mac_wise_commands_removed[refined_added].append(mac)
+                    diff_list_removed.append(refined_added)
             if ('add_error' in payload[mac]):
                 for added in payload[mac]['add_error']:
                     if (added not in mac_wise_error_added):
